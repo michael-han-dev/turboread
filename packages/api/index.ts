@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -74,6 +74,34 @@ const app = new Elysia()
 }, {
   params: t.Object({
     userId: t.String()
+  })
+})
+
+.get('/file/:id', async ({ params }) => {
+  // Get file metadata from DB
+  const file = await db
+    .select()
+    .from(files)
+    .where(eq(files.id, params.id));
+
+  if (!file[0]) {
+    throw new Error('File not found');
+  }
+
+  // Generate a signed URL for downloading
+  const command = new GetObjectCommand({
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: file[0].key
+  });
+  const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+  return { 
+    file: file[0],
+    downloadUrl: url 
+  };
+}, {
+  params: t.Object({
+    id: t.String()
   })
 })
 

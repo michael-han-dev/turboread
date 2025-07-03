@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "type": "module",
     "scripts": {
-        "generate": "drizzle-kit generate:pg",
+        "generate": "drizzle-kit generate",
         "dev": "bun run index.ts"
     },
     "dependencies": {
