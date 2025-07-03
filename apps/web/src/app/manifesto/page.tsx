@@ -1,96 +1,46 @@
-import { basehub } from "basehub";
-import { WaitlistWrapper } from "@/components/box";
-import { RichText } from "basehub/react-rich-text";
-import { Alex_Brush } from "next/font/google";
-import clsx from "clsx";
-import { Metadata } from "next";
-import "../../basehub.config";
+'use client';
 
-const font = Alex_Brush({
-  variable: "--font-alex-brush",
-  subsets: ["latin"],
-  weight: "400",
-});
-
-export const dynamic = "force-static";
-export const revalidate = 30;
-
-export const generateMetadata = async (): Promise<Metadata> => {
-  const data = await basehub().query({
-    settings: {
-      metadata: {
-        titleTemplate: true,
-        defaultTitle: true,
-        defaultDescription: true,
-        favicon: {
-          url: true,
-        },
-        ogImage: {
-          url: true,
-        },
-      },
-    },
-  });
-  return {
-    title: {
-      template: data.settings.metadata.titleTemplate,
-      default: data.settings.metadata.defaultTitle,
-    },
-    description: data.settings.metadata.defaultDescription,
-    openGraph: {
-      type: "website",
-      images: [data.settings.metadata.ogImage.url],
-    },
-    twitter: {
-      card: "summary_large_image",
-      images: [data.settings.metadata.ogImage.url],
-    },
-    icons: [data.settings.metadata.favicon.url],
-  };
-};
-
-export default async function Manifesto() {
-  const { manifesto } = await basehub().query({
-    manifesto: {
-      body: {
-        json: {
-          content: true,
-        },
-      },
-      author: {
-        signatureName: true,
-        name: true,
-        role: true,
-      },
-    },
-  });
-
+export default function Manifesto() {
   return (
-    <WaitlistWrapper>
-      <div className="flex flex-col gap-10">
-        <div className="text-slate-11 [&>p]:tracking-tight [&>p]:leading-[1.6] [&>p:not(:last-child)]:mb-3 text-pretty text-start">
-          {manifesto.body && <RichText content={manifesto.body.json.content} />}
-        </div>
-        <div className="flex flex-col gap-10">
-          <div className="flex flex-col gap-0.5 items-start">
-            <p
-              className={clsx(
-                "text-slate-12 text-4xl font-medium italic transform -rotate-12",
-                font.className
-              )}
+    <div className="flex flex-col items-center gap-6 w-full">
+      {/* Navigation */}
+      <nav className="bg-slate-1/70 backdrop-blur-sm rounded-full p-1 shadow-md">
+        <ul className="flex items-center">
+          <li>
+            <a
+              href="/"
+              className="px-4 py-1 rounded-full text-sm font-medium text-slate-12 hover:bg-slate-12/10 transition-colors"
             >
-              {manifesto.author.signatureName}
-            </p>
-            <p className="text-slate-11 text-sm font-medium">
-              {manifesto.author.name}{" "}
-              <span className="text-slate-10 text-xs">
-                {manifesto.author.role}
-              </span>
-            </p>
-            <p></p>
-          </div>
-        </div>
+              Waitlist
+            </a>
+          </li>
+          <li>
+            <a
+              href="/manifesto"
+              aria-current="page"
+              className="px-4 py-1 rounded-full text-sm font-medium bg-slate-12 text-slate-1 shadow-sm"
+            >
+              Manifesto
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      {/* Manifesto content */}
+      <div className="max-w-[500px] mx-auto w-full bg-gray-1/85 backdrop-blur-md rounded-2xl shadow-lg p-8 text-center space-y-4">
+        <h1 className="text-3xl font-medium text-slate-12">TurboRead Manifesto</h1>
+        <p className="text-slate-10 leading-relaxed">
+          TurboRead is on a mission to help everyone read faster, understand deeper, and learn more efficiently.
+          We believe technology should augment human cognition—turning dense documents into bite-sized insights and
+          freeing your time for what matters most.
+        </p>
+        <p className="text-slate-10 leading-relaxed">
+          By combining AI-powered summarisation, smart highlights, and voice playback, TurboRead lets you consume
+          knowledge at the speed of thought. Join us on this journey—because the world moves fast, and your reading
+          should keep up.
+        </p>
+        <p className="text-slate-11 font-medium">— The TurboRead Team</p>
       </div>
-    </WaitlistWrapper>
+    </div>
   );
 }
