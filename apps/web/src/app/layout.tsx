@@ -42,10 +42,10 @@ export default function RootLayout({
         </ThemeProvider>
         <MeshGradientComponent
           colors={[
-            "#667eea", // Purple blue
-            "#764ba2", // Purple 
-            "#f093fb", // Pink
-            "#f5576c"  // Red pink
+            "#667eea", //purple blue
+            "#764ba2", //purple 
+            "#f093fb", //pink
+            "#f5576c"  //red pink
           ]}
           speed={3}
           style={{

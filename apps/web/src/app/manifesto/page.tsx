@@ -28,21 +28,23 @@ export default function Manifesto() {
       </nav>
 
       {/* Manifesto content */}
-      <div className="max-w-[800px] mx-auto w-full bg-gray-1/85 backdrop-blur-md rounded-2xl shadow-lg p-12 text-center space-y-6">
-        <h1 className="text-4xl font-medium text-slate-12 font-['var(--font-instrument-serif)']">TurboRead Manifesto</h1>
-        <p className="text-lg text-slate-10 leading-relaxed">
-          TurboRead is on a mission to help everyone read faster, understand deeper, and learn more efficiently.
-          We believe technology should augment human cognition—turning dense documents into bite-sized insights and
-          freeing your time for what matters most.
-        </p>
-        <p className="text-lg text-slate-10 leading-relaxed">
-          By combining AI-powered summarisation, smart highlights, and voice playback, TurboRead lets you consume
-          knowledge at the speed of thought. Join us on this journey—because the world moves fast, and your reading
-          should keep up.
-        </p>
-        <p className="text-lg text-slate-11 font-medium">— The TurboRead Team</p>
+      <div className="max-w-[800px] mx-auto w-full bg-white/10 dark:bg-slate-900/20 backdrop-blur-md rounded-2xl shadow-lg overflow-hidden">
+        <div className="p-12 text-center space-y-6">
+          <h1 className="text-4xl font-medium text-slate-12 font-['var(--font-instrument-serif)']">TurboRead Manifesto</h1>
+          <p className="text-lg text-slate-10 leading-relaxed">
+            TurboRead is on a mission to help everyone read faster, understand deeper, and learn more efficiently.
+            We believe technology should augment human cognition—turning dense documents into bite-sized insights and
+            freeing your time for what matters most.
+          </p>
+          <p className="text-lg text-slate-10 leading-relaxed">
+            By combining AI-powered summarisation, smart highlights, and voice playback, TurboRead lets you consume
+            knowledge at the speed of thought. Join us on this journey—because the world moves fast, and your reading
+            should keep up.
+          </p>
+          <p className="text-lg text-slate-11 font-medium">— The TurboRead Team</p>
+        </div>
+        <Footer />
       </div>
-      <Footer />
     </div>
   );
 }

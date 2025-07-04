@@ -10,7 +10,6 @@ export function ThemeSwitcher({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
-  // Handle mounting state
   React.useEffect(() => {
     setMounted(true)
   }, [])
