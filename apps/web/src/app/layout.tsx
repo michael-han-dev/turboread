@@ -1,7 +1,8 @@
 import type { Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Instrument_Serif } from "next/font/google";
 import { MeshGradientComponent } from "../components/mesh-gradient";
 import "../styles/globals.css";
+import { ThemeProvider } from '../components/theme-provider'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -9,8 +10,16 @@ const geistSans = Geist({
   preload: true,
 });
 
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  weight: "400",
+  style:["normal", "italic"],
+  preload: true,
+});
+
 export const viewport: Viewport = {
-  maximumScale: 1, // Disable auto-zoom on mobile Safari
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -21,14 +30,16 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.className} antialiased max-w-screen min-h-svh bg-slate-1 text-slate-12 duration-75 transition-opacity`}
+        className={`${geistSans.className} ${instrumentSerif.variable} antialiased max-w-screen min-h-svh bg-transparent text-slate-12 duration-75 transition-opacity`}
         suppressHydrationWarning
       >
-        <div className="max-w-screen-sm mx-auto w-full relative z-[1] flex flex-col min-h-screen">
-          <div className="flex flex-col flex-1 items-center justify-center gap-8 px-5">
-            <main className="flex items-center justify-center w-full">{children}</main>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <div className="max-w-screen-lg mx-auto w-full relative z-[1] flex flex-col min-h-screen">
+            <div className="flex flex-col flex-1 items-center justify-center gap-12 px-8">
+              <main className="flex items-center justify-center w-full">{children}</main>
+            </div>
           </div>
-        </div>
+        </ThemeProvider>
         <MeshGradientComponent
           colors={[
             "#667eea", // Purple blue

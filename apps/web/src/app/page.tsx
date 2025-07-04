@@ -1,6 +1,7 @@
 'use client';
 
 import { InputForm } from "../components/waitlist-form";
+import { Footer } from '../components/footer'
 
 async function submitWaitlist(formData: FormData): Promise<{ success: true } | { success: false; error: string }> {
   
@@ -17,15 +18,15 @@ async function submitWaitlist(formData: FormData): Promise<{ success: true } | {
 
 export default function Home() {
   return (
-    <div className="flex flex-col items-center gap-6 w-full">
+    <div className="flex flex-col items-center gap-8 w-full">
       {/* Navigation */}
-      <nav className="bg-slate-1/70 backdrop-blur-sm rounded-full p-1 shadow-md">
+      <nav className="bg-slate-1/70 backdrop-blur-sm rounded-full p-1.5 shadow-md">
         <ul className="flex items-center">
           <li>
             <a
               href="/"
               aria-current="page"
-              className="px-4 py-1 rounded-full text-sm font-medium bg-slate-12 text-slate-1 shadow-sm"
+              className="px-6 py-2 rounded-full text-lg font-medium bg-slate-12 text-slate-1 shadow-sm"
             >
               Waitlist
             </a>
@@ -33,7 +34,7 @@ export default function Home() {
           <li>
             <a
               href="/manifesto"
-              className="px-4 py-1 rounded-full text-sm font-medium text-slate-12 hover:bg-slate-12/10 transition-colors"
+              className="px-6 py-2 rounded-full text-lg font-medium text-slate-12 hover:bg-slate-12/10 transition-colors"
             >
               Manifesto
             </a>
@@ -42,17 +43,17 @@ export default function Home() {
       </nav>
 
       {/* Card */}
-      <div className="w-full mx-auto max-w-[500px] flex flex-col justify-center items-center bg-gray-1/85 backdrop-blur-md pb-0 overflow-hidden rounded-2xl shadow-lg">
-        <div className="flex flex-col items-center gap-4 flex-1 text-center w-full p-8 pb-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-medium text-slate-12 whitespace-pre-wrap text-pretty">
-              (check)TurboRead
+      <div className="w-full mx-auto max-w-[800px] flex flex-col justify-center items-center bg-gray-1/85 backdrop-blur-md pb-0 overflow-hidden rounded-2xl shadow-2xl">
+        <div className="flex flex-col items-center gap-8 flex-1 text-center w-full p-12">
+          <div className="space-y-3">
+            <h1 className="text-5xl font-medium text-slate-12 whitespace-pre-wrap text-pretty italic font-serif">
+              TurboRead
             </h1>
-            <p className="text-slate-10 tracking-tight text-pretty">
-              Speed-read your documents with AI-powered highlighting and voice assistance.
+            <p className="text-2xl text-slate-10 tracking-tight text-pretty max-w-[600px]">
+              Speed-read your documents or anything on the web with highlighting and voice assistance.
             </p>
           </div>
-          <div className="px-1 flex flex-col w-full self-stretch">
+          <div className="px-1 flex flex-col w-full max-w-[500px]">
             <InputForm
               {...{
                 type: "email" as const,
@@ -69,6 +70,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

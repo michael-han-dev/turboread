@@ -21,10 +21,10 @@ export function ThemeSwitcher({ className }: { className?: string }) {
       <div className={clsx(className, 'flex gap-1 opacity-0')}>
         {options.map((option, i) => (
           <React.Fragment key={option}>
-            <button className="text-xs">
+            <button className="text-md">
               <span>{option}</span>
             </button>
-            {i < options.length - 1 && <span className="text-xs">/</span>}
+            {i < options.length - 1 && <span className="text-md">/</span>}
           </React.Fragment>
         ))}
       </div>
@@ -37,7 +37,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         <React.Fragment key={option}>
           <button
             className={clsx(
-              'text-xs text-slate-10 flex items-center justify-center gap-1 max-w-max',
+              'text-md text-slate-10 flex items-center justify-center gap-1 max-w-max',
               theme === option && '!text-slate-12 font-medium'
             )}
             style={{
@@ -49,7 +49,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
             <span className="first-letter:uppercase">{option}</span>
           </button>
           {i < options.length - 1 && (
-            <span className="text-xs text-slate-8">/</span>
+            <span className="text-md text-slate-8">/</span>
           )}
         </React.Fragment>
       ))}
