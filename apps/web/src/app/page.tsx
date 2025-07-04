@@ -20,7 +20,7 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center gap-8 w-full">
       {/* Navigation */}
-      <nav className="bg-slate-1/70 backdrop-blur-sm rounded-full p-1.5 shadow-md">
+      <nav className="bg-white/10 dark:bg-slate-900/50 backdrop-blur-sm rounded-full p-1.5 shadow-md">
         <ul className="flex items-center">
           <li>
             <a

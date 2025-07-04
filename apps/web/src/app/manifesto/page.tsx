@@ -5,7 +5,7 @@ export default function Manifesto() {
   return (
     <div className="flex flex-col items-center gap-8 w-full">
       {/* Navigation */}
-      <nav className="bg-slate-1/70 backdrop-blur-sm rounded-full p-1.5 shadow-md">
+      <nav className="bg-white/10 dark:bg-slate-900/50 backdrop-blur-sm rounded-full p-1.5 shadow-md">
         <ul className="flex items-center">
           <li>
             <a
@@ -28,7 +28,7 @@ export default function Manifesto() {
       </nav>
 
       {/* Manifesto content */}
-      <div className="max-w-[800px] mx-auto w-full bg-white/10 dark:bg-slate-900/20 backdrop-blur-md rounded-2xl shadow-lg overflow-hidden">
+      <div className="max-w-[800px] mx-auto w-full bg-white/10 dark:bg-slate-900/50 dark:bg-slate-900/20 backdrop-blur-md rounded-2xl shadow-lg overflow-hidden">
         <div className="p-12 text-center space-y-6">
           <h1 className="text-4xl font-medium text-slate-12 font-['var(--font-instrument-serif)']">TurboRead Manifesto</h1>
           <p className="text-lg text-slate-10 leading-relaxed">
