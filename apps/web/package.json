@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@auth/drizzle-adapter": "^1.10.0",
     "@hookform/resolvers": "^3.9.1",
     "@paper-design/shaders-react": "latest",
     "@radix-ui/react-accordion": "1.2.2",
@@ -39,8 +40,6 @@
     "@radix-ui/react-toggle-group": "1.1.1",
     "@radix-ui/react-tooltip": "1.1.6",
     "@react-email/components": "latest",
-    "@auth/drizzle-adapter": "^1.10.0",
-    "autoprefixer": "^10.4.20",
     "basehub": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -58,7 +57,6 @@
     "react-hook-form": "^7.54.1",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
-    "resend": "latest",
     "sonner": "^1.7.1",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
@@ -67,14 +65,14 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autoprefixer": "^10.4",
     "eslint": "^9",
     "eslint-config-next": "15.3.4",
-    "postcss": "^8.5",
-    "tailwindcss": "^4",
+    "postcss": "^8.4",
+    "tailwindcss": "^3.4.17",
     "typescript": "^5"
   }
 }
