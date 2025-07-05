@@ -11,6 +11,8 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 const client = postgres(process.env.DATABASE_URL!);
 const db = drizzle(client);
 
+export { db };
+
 // Run migrations
 const runMigrations = async () => {
   console.log('Running migrations...');
