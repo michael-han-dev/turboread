@@ -1,10 +1,14 @@
 import { NextAuthOptions } from "next-auth"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import GitHubProvider from "next-auth/providers/github"
-import { db } from "@turboread/api"
+import { drizzle } from "drizzle-orm/postgres-js"
+import postgres from "postgres"
+
+const client = postgres(process.env.DATABASE_URL!)
+const authDb = drizzle(client)
 
 export const authOptions: NextAuthOptions = {
-  adapter: DrizzleAdapter(db),
+  adapter: DrizzleAdapter(authDb),
   providers: [
     GitHubProvider({
       clientId: process.env.GITHUB_ID!,
