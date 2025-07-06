@@ -3,6 +3,7 @@ import { Geist, Instrument_Serif } from "next/font/google";
 import { MeshGradientComponent } from "../components/mesh-gradient";
 import "../styles/globals.css";
 import { ThemeProvider } from '../components/theme-provider'
+import { AuthProvider } from '../components/auth-provider'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,13 +34,15 @@ export default function RootLayout({
         className={`${geistSans.className} ${instrumentSerif.variable} antialiased max-w-screen min-h-svh bg-transparent text-slate-12 duration-75 transition-opacity`}
         suppressHydrationWarning
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="max-w-screen-lg mx-auto w-full relative z-[1] flex flex-col min-h-screen">
-            <div className="flex flex-col flex-1 items-center justify-center gap-12 px-8">
-              <main className="flex items-center justify-center w-full">{children}</main>
+        <AuthProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <div className="max-w-screen-lg mx-auto w-full relative z-[1] flex flex-col min-h-screen">
+              <div className="flex flex-col flex-1 items-center justify-center gap-12 px-8">
+                <main className="flex items-center justify-center w-full">{children}</main>
+              </div>
             </div>
-          </div>
-        </ThemeProvider>
+          </ThemeProvider>
+        </AuthProvider>
         <MeshGradientComponent
           colors={[
             "#667eea", //purple blue

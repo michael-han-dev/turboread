@@ -1,18 +1,19 @@
 import { NextAuthOptions } from "next-auth"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
-import GitHubProvider from "next-auth/providers/github"
+import GoogleProvider from "next-auth/providers/google"
 import { drizzle } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 
+//potentially conflicting as this may not be s3.
 const client = postgres(process.env.DATABASE_URL!)
 const authDb = drizzle(client)
 
 export const authOptions: NextAuthOptions = {
   adapter: DrizzleAdapter(authDb),
   providers: [
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!,
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
   session: {
