@@ -8,6 +8,13 @@
       "when": 1751503396388,
       "tag": "0000_cool_prodigy",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1751907804120,
+      "tag": "0001_melted_sugar_man",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@
         "dev": "bun run index.ts"
     },
     "dependencies": {
+        "@auth/drizzle-adapter": "^1.10.0",
         "@aws-sdk/client-s3": "^3.0.0",
         "@aws-sdk/s3-request-presigner": "^3.0.0",
         "drizzle-orm": "^0.29.0",
@@ -15,7 +16,7 @@
     },
     "devDependencies": {
         "dotenv-cli": "^8.0.0",
-        "drizzle-kit": "^0.20.0",
+        "drizzle-kit": "^0.20.18",
         "typescript": "^5.0.0"
     }
 }
