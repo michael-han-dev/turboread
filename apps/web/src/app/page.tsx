@@ -2,19 +2,6 @@
 import { Footer } from '../components/footer'
 import { AuthNav } from '../components/auth-nav'
 
-async function submitWaitlist(formData: FormData): Promise<{ success: true } | { success: false; error: string }> {
-  
-  const email = formData.get('email') as string;
-  
-  if (!email || !email.includes('@')) {
-    return { success: false, error: 'Please enter a valid email address' };
-  }
-  
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  return { success: true };
-}
-
 export default function Home() {
   return (
     <div className="flex flex-col items-center gap-8 w-full">
@@ -54,7 +41,7 @@ export default function Home() {
               Speed-read your documents or anything on the web with highlighting and voice assistance (coming soon!).
             </p>
           </div>
-          <div className="px-1 py-4 mb-4 flex flex-col w-full max-w-[500px]">
+          <div className="px-1 py-4 mb-4 items-center flex flex-col w-full max-w-[500px]">
             <AuthNav />
           </div>
         </div>

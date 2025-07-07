@@ -19,6 +19,9 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "database",
   },
+  pages: {
+    signIn: "/",
+  },
   callbacks: {
     session: ({ session, user }) => ({
       ...session,
@@ -27,5 +30,12 @@ export const authOptions: NextAuthOptions = {
         id: user.id,
       },
     }),
+    redirect: ({ url, baseUrl }) => {
+      // Redirect to dashboard after successful sign in
+      if (url === baseUrl) return `${baseUrl}/dashboard`
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      if (new URL(url).origin === baseUrl) return url
+      return baseUrl
+    },
   },
 } 
