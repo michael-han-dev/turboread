@@ -15,6 +15,13 @@
       "when": 1751907804120,
       "tag": "0001_melted_sugar_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1751926775318,
+      "tag": "0002_harsh_kitty_pryde",
+      "breakpoints": true
     }
   ]
 }

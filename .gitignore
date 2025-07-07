@@ -2,9 +2,17 @@
 **/node_modules
 **/.next
 
+# lock files (keep only root pnpm-lock.yaml)
+**/package-lock.json
+**/bun.lock
+**/yarn.lock
+# Keep root level lock files
+!/pnpm-lock.yaml
+
 # output
 out
 dist
+*.tsbuildinfo
 *.tgz
 
 # code coverage
@@ -27,7 +35,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # caches
 .eslintcache
 .cache
-*.tsbuildinfo
+.turbo
 
 # IntelliJ based IDEs
 .idea
@@ -35,6 +43,14 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 
+# VSCode
+.vscode/
+
+# Database & deployment
 keys/
 *.pem
 .cursor
+
+# Build artifacts
+**/.next
+**/dist
