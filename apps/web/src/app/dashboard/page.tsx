@@ -109,7 +109,7 @@ export default function Dashboard() {
         </div>
 
         {/* Files List */}
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8">
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 mb-4">
           <h3 className="text-xl font-semibold text-slate-12 mb-4">Your Files</h3>
           {files.length === 0 ? (
             <div className="text-center py-8 text-slate-12/60">
