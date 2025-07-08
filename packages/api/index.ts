@@ -1,4 +1,5 @@
 import { Elysia, t } from "elysia";
+import { cors } from "@elysiajs/cors";
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -31,23 +32,43 @@ const s3 = new S3Client({
   }
 });
 
+// Helper function to ensure user exists
+const ensureUser = async (userId: string) => {
+  const existingUser = await db
+    .select({ fileCount: users.fileCount })
+    .from(users)
+    .where(eq(users.id, userId));
+
+  if (!existingUser[0]) {
+    // Create user with default values
+    await db.insert(users).values({
+      id: userId,
+      email: `user_${userId}@example.com`,
+      fileCount: 0
+    });
+    return { fileCount: 0 };
+  }
+
+  return existingUser[0];
+};
+
 const app = new Elysia()
+.use(cors({
+  origin: 'http://localhost:3000', // Your frontend URL
+  credentials: true
+}))
+.get('/', () => {
+  return { message: 'Server is running!' };
+})
 
 // Check user file count and limit
 .get('/user/:userId/file-stats', async ({ params }) => {
-  const user = await db
-    .select({ fileCount: users.fileCount })
-    .from(users)
-    .where(eq(users.id, params.userId));
-
-  if (!user[0]) {
-    throw new Error('User not found');
-  }
+  const user = await ensureUser(params.userId);
 
   return { 
-    fileCount: user[0].fileCount,
+    fileCount: user.fileCount,
     fileLimit: FILE_LIMIT,
-    canUpload: user[0].fileCount < FILE_LIMIT
+    canUpload: user.fileCount < FILE_LIMIT
   };
 }, {
   params: t.Object({
@@ -57,16 +78,9 @@ const app = new Elysia()
 
 .get('/upload/url', async ({ query }) => {
   // Check if user can upload more files
-  const user = await db
-    .select({ fileCount: users.fileCount })
-    .from(users)
-    .where(eq(users.id, query.userId));
+  const user = await ensureUser(query.userId);
 
-  if (!user[0]) {
-    throw new Error('User not found');
-  }
-
-  if (user[0].fileCount >= FILE_LIMIT) {
+  if (user.fileCount >= FILE_LIMIT) {
     throw new Error(`File limit reached. Maximum ${FILE_LIMIT} files allowed.`);
   }
 
@@ -87,16 +101,9 @@ const app = new Elysia()
 
 .post('/upload', async ({ body }) => {
   // Double-check file limit before inserting
-  const user = await db
-    .select({ fileCount: users.fileCount })
-    .from(users)
-    .where(eq(users.id, body.userId));
+  const user = await ensureUser(body.userId);
 
-  if (!user[0]) {
-    throw new Error('User not found');
-  }
-
-  if (user[0].fileCount >= FILE_LIMIT) {
+  if (user.fileCount >= FILE_LIMIT) {
     throw new Error(`File limit reached. Maximum ${FILE_LIMIT} files allowed.`);
   }
 
@@ -112,7 +119,7 @@ const app = new Elysia()
   // Increment user file count
   await db
     .update(users)
-    .set({ fileCount: user[0].fileCount + 1 })
+    .set({ fileCount: user.fileCount + 1 })
     .where(eq(users.id, body.userId));
 
   return { success: true, file: result[0] };

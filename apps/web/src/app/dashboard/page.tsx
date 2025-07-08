@@ -232,7 +232,7 @@ export default function Dashboard() {
                 uploading 
                   ? 'bg-gray-500 cursor-not-allowed' 
                   : !fileStats?.canUpload
-                  ? 'bg-red-600 cursor-not-allowed'
+                  ? 'bg-red-600/70 cursor-not-allowed'
                   : 'bg-purple-600 hover:bg-purple-700'
               }`}
             >
