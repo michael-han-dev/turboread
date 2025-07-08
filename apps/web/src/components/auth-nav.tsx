@@ -41,7 +41,7 @@ export function AuthNav({ className = "" }: { className?: string }) {
 
   return (
     <button
-      onClick={() => signIn("google")}
+      onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
       className={clsx(
         "px-6 py-1 rounded-full text-md font-medium bg-slate-900/10 dark:bg-slate-200/30 text-slate-1 dark:text-slate-12 hover:bg-slate-11 transition-colors hover:underline",
         className

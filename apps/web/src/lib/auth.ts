@@ -31,11 +31,18 @@ export const authOptions: NextAuthOptions = {
       },
     }),
     redirect: ({ url, baseUrl }) => {
-      // Redirect to dashboard after successful sign in
-      if (url === baseUrl) return `${baseUrl}/dashboard`
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      if (new URL(url).origin === baseUrl) return url
-      return baseUrl
+      if (url.startsWith(baseUrl + "/api/auth/callback")) {
+        return `${baseUrl}/dashboard`
+      }
+      if (url === baseUrl || url === baseUrl + "/") {
+        return `${baseUrl}/dashboard`
+      }
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`
+      }
+      if (new URL(url).origin === baseUrl) {
+      }
+      return `${baseUrl}/dashboard`
     },
   },
 } 

@@ -6,11 +6,30 @@ import { useEffect, useState } from "react"
 import { AuthNav } from "../../components/auth-nav"
 import { Footer } from "../../components/footer"
 
+const FILE_LIMIT = 2;
+
+interface FileStats {
+  fileCount: number;
+  fileLimit: number;
+  canUpload: boolean;
+}
+
+interface FileData {
+  id: string;
+  filename: string;
+  key: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function Dashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [files, setFiles] = useState<any[]>([])
+  const [files, setFiles] = useState<FileData[]>([])
+  const [fileStats, setFileStats] = useState<FileStats | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === "loading") return
@@ -18,29 +37,119 @@ export default function Dashboard() {
       router.push("/")
       return
     }
+    
+    fetchFiles()
+    fetchFileStats()
   }, [session, status, router])
+
+  const fetchFileStats = async () => {
+    if (!session?.user?.id) return
+    
+    try {
+      const response = await fetch(`http://localhost:3001/user/${session.user.id}/file-stats`)
+      if (!response.ok) throw new Error('Failed to fetch file stats')
+      const stats = await response.json()
+      setFileStats(stats)
+    } catch (error) {
+      console.error('Error fetching file stats:', error)
+    }
+  }
+
+  const fetchFiles = async () => {
+    if (!session?.user?.id) return
+    
+    try {
+      const response = await fetch(`http://localhost:3001/files/${session.user.id}`)
+      if (!response.ok) throw new Error('Failed to fetch files')
+      const data = await response.json()
+      setFiles(data.files)
+    } catch (error) {
+      console.error('Error fetching files:', error)
+    }
+  }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file || !session?.user?.id) return
+
+    // Check if user can upload
+    if (!fileStats?.canUpload) {
+      setError(`File limit reached! You can only upload ${fileStats?.fileLimit} files.`)
+      return
+    }
 
     setUploading(true)
+    setError(null)
+    
     try {
-      // Implement actual file upload to backend, simulate for now
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Get presigned URL
+      const urlResponse = await fetch(
+        `http://localhost:3001/upload/url?filename=${encodeURIComponent(file.name)}&type=${encodeURIComponent(file.type)}&userId=${session.user.id}`
+      )
       
-      const newFile = {
-        id: Date.now(),
-        name: file.name,
-        size: file.size,
-        uploadedAt: new Date().toISOString()
+      if (!urlResponse.ok) {
+        const errorData = await urlResponse.text()
+        throw new Error(errorData || 'Failed to get upload URL')
       }
       
-      setFiles(prev => [...prev, newFile])
+      const { url } = await urlResponse.json()
+
+      // Upload to S3
+      const uploadResponse = await fetch(url, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      })
+
+      if (!uploadResponse.ok) throw new Error('Failed to upload file')
+
+      // Save to database
+      const key = new URL(url).pathname.substring(1) // Extract key from URL
+      const dbResponse = await fetch('http://localhost:3001/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          key: key,
+          userId: session.user.id,
+        }),
+      })
+
+      if (!dbResponse.ok) {
+        const errorData = await dbResponse.text()
+        throw new Error(errorData || 'Failed to save file metadata')
+      }
+
+      // Refresh data
+      await fetchFiles()
+      await fetchFileStats()
+      
     } catch (error) {
       console.error('Upload failed:', error)
+      setError(error instanceof Error ? error.message : 'Upload failed')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleFileDelete = async (fileKey: string) => {
+    try {
+      const response = await fetch(`http://localhost:3001/file?key=${encodeURIComponent(fileKey)}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) throw new Error('Failed to delete file')
+
+      // Refresh data
+      await fetchFiles()
+      await fetchFileStats()
+    } catch (error) {
+      console.error('Delete failed:', error)
+      setError(error instanceof Error ? error.message : 'Delete failed')
     }
   }
 
@@ -69,6 +178,18 @@ export default function Dashboard() {
             </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4 mb-4">
+            <p className="text-red-200">{error}</p>
+            <button 
+              onClick={() => setError(null)}
+              className="text-red-300 hover:text-red-100 text-sm mt-2"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Welcome Card */}
         <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 mb-8">
@@ -78,6 +199,19 @@ export default function Dashboard() {
           <p className="text-slate-12/80 text-pretty">
             Upload your documents to start speed-reading with TurboRead.
           </p>
+          {fileStats && (
+            <div className="mt-4 flex items-center gap-4">
+              <div className="text-slate-12/80">
+                <span className="font-medium">Files: {fileStats.fileCount}/{fileStats.fileLimit}</span>
+              </div>
+              <div className="flex-1 bg-white/20 rounded-full h-2">
+                <div 
+                  className="bg-purple-500 h-2 rounded-full transition-all"
+                  style={{ width: `${(fileStats.fileCount / fileStats.fileLimit) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Upload Section */}
@@ -87,7 +221,7 @@ export default function Dashboard() {
             <input
               type="file"
               onChange={handleFileUpload}
-              disabled={uploading}
+              disabled={uploading || !fileStats?.canUpload}
               className="hidden"
               id="file-upload"
               accept=".pdf,.doc,.docx,.txt"
@@ -97,10 +231,17 @@ export default function Dashboard() {
               className={`cursor-pointer inline-flex items-center px-6 py-3 rounded-lg font-medium text-slate-12 transition-colors ${
                 uploading 
                   ? 'bg-gray-500 cursor-not-allowed' 
+                  : !fileStats?.canUpload
+                  ? 'bg-red-600 cursor-not-allowed'
                   : 'bg-purple-600 hover:bg-purple-700'
               }`}
             >
-              {uploading ? 'Uploading...' : 'Choose File to Upload'}
+              {uploading 
+                ? 'Uploading...' 
+                : !fileStats?.canUpload 
+                ? `Limit Reached (${FILE_LIMIT} files max)`
+                : 'Choose File to Upload'
+              }
             </label>
             <p className="text-slate-12/60 mt-2 text-sm">
               Supports PDF, DOC, DOCX, and TXT files
@@ -129,15 +270,23 @@ export default function Dashboard() {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="text-slate-12 font-medium">{file.name}</h4>
+                      <h4 className="text-slate-12 font-medium">{file.filename}</h4>
                       <p className="text-slate-12/60 text-sm">
-                        {(file.size / 1024 / 1024).toFixed(2)} MB • {new Date(file.uploadedAt).toLocaleDateString()}
+                        Uploaded {new Date(file.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
-                  <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-slate-12 rounded-lg transition-colors">
-                    Open
-                  </button>
+                  <div className="flex gap-2">
+                    <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-slate-12 rounded-lg transition-colors">
+                      Open
+                    </button>
+                    <button 
+                      onClick={() => handleFileDelete(file.key)}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-slate-12 rounded-lg transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
