@@ -16,6 +16,7 @@ export const users = pgTable("user", {
   email: text("email").notNull(),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
+  fileCount: integer("file_count").notNull().default(0), // Track number of files uploaded
 })
 
 export const accounts = pgTable(

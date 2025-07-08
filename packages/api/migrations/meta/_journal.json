@@ -22,6 +22,13 @@
       "when": 1751926775318,
       "tag": "0002_harsh_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1752012791385,
+      "tag": "0003_wandering_pete_wisdom",
+      "breakpoints": true
     }
   ]
 }
