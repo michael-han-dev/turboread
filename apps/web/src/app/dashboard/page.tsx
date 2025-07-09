@@ -8,6 +8,7 @@ import { AuthNav } from "../../components/auth-nav"
 import { Footer } from "../../components/footer"
 
 const FILE_LIMIT = 2;
+const MAX_FILE_SIZE = 20 * 1024 * 1024; 
 
 interface FileStats {
   fileCount: number;
@@ -88,13 +89,20 @@ export default function Dashboard() {
       return
     }
 
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`File too large. Maximum size allowed is ${MAX_FILE_SIZE / (1024 * 1024)}MB. File size: ${(file.size / (1024 * 1024)).toFixed(1)}MB`)
+      e.target.value = ''
+      return
+    }
+
     setUploading(true)
     setError(null)
     
     try {
       // Get presigned URL
       const urlResponse = await fetch(
-        `http://localhost:3001/upload/url?filename=${encodeURIComponent(file.name)}&type=${encodeURIComponent(file.type)}&userId=${session.user.id}`
+        `http://localhost:3001/upload/url?filename=${encodeURIComponent(file.name)}&type=${encodeURIComponent(file.type)}&size=${file.size}&userId=${session.user.id}`
       )
       
       if (!urlResponse.ok) {
@@ -256,7 +264,7 @@ export default function Dashboard() {
               }
             </label>
             <p className="text-slate-12/60 mt-2 text-sm">
-              Supports PDF, and TXT files.
+              Supports PDF, and TXT files. Maximum 20MB per file.
             </p>
           </div>
         </div>

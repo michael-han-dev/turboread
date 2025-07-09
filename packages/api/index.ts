@@ -20,6 +20,7 @@ const pdf = (() => {
 })();
 
 const FILE_LIMIT = 2; 
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 const client = postgres(process.env.DATABASE_URL!);
 const db = drizzle(client);
@@ -189,6 +190,16 @@ const app = new Elysia()
     throw new Error(`Invalid file type. Only PDF and TXT files are allowed. Received: ${extension || 'unknown'}`);
   }
 
+  // Validate file size
+  const fileSize = parseInt(query.size);
+  if (isNaN(fileSize) || fileSize <= 0) {
+    throw new Error('Invalid file size provided.');
+  }
+  
+  if (fileSize > MAX_FILE_SIZE) {
+    throw new Error(`File too large. Maximum size allowed is ${MAX_FILE_SIZE / (1024 * 1024)}MB. File size: ${(fileSize / (1024 * 1024)).toFixed(1)}MB`);
+  }
+
   // Generate a unique key to avoid conflicts
   const timestamp = Date.now();
   const sanitizedFilename = query.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -205,6 +216,7 @@ const app = new Elysia()
   query: t.Object({
     filename: t.String(),
     type: t.String(),
+    size: t.String(),
     userId: t.String()
   })
 })
