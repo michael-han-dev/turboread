@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { FileText } from "lucide-react"
 import { AuthNav } from "../../components/auth-nav"
 import { Footer } from "../../components/footer"
 
@@ -92,7 +93,7 @@ export default function Dashboard() {
         throw new Error(errorData || 'Failed to get upload URL')
       }
       
-      const { url } = await urlResponse.json()
+      const { url, key } = await urlResponse.json()
 
       // Upload to S3
       const uploadResponse = await fetch(url, {
@@ -105,8 +106,7 @@ export default function Dashboard() {
 
       if (!uploadResponse.ok) throw new Error('Failed to upload file')
 
-      // Save to database
-      const key = new URL(url).pathname.substring(1) // Extract key from URL
+      // Save to database - use the key returned from backend
       const dbResponse = await fetch('http://localhost:3001/upload', {
         method: 'POST',
         headers: {
@@ -224,7 +224,7 @@ export default function Dashboard() {
               disabled={uploading || !fileStats?.canUpload}
               className="hidden"
               id="file-upload"
-              accept=".pdf,.doc,.docx,.txt"
+              accept=".pdf,.txt"
             />
             <label
               htmlFor="file-upload"
@@ -233,7 +233,7 @@ export default function Dashboard() {
                   ? 'bg-gray-500 cursor-not-allowed' 
                   : !fileStats?.canUpload
                   ? 'bg-red-600/70 cursor-not-allowed'
-                  : 'bg-purple-600 hover:bg-purple-700'
+                  : 'bg-purple-600/70 hover:bg-purple-700'
               }`}
             >
               {uploading 
@@ -244,7 +244,7 @@ export default function Dashboard() {
               }
             </label>
             <p className="text-slate-12/60 mt-2 text-sm">
-              Supports PDF, DOC, DOCX, and TXT files
+              Supports PDF, and TXT files.
             </p>
           </div>
         </div>
@@ -265,9 +265,7 @@ export default function Dashboard() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-slate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+                      <FileText className="w-5 h-5 text-slate-12" />
                     </div>
                     <div>
                       <h4 className="text-slate-12 font-medium">{file.filename}</h4>
@@ -277,12 +275,15 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-slate-12 rounded-lg transition-colors">
+                    <button 
+                      onClick={() => router.push(`/file/${file.id}`)}
+                      className="px-4 py-2 bg-purple-600/70 hover:bg-purple-700 text-slate-12 rounded-lg transition-colors"
+                    >
                       Open
                     </button>
                     <button 
                       onClick={() => handleFileDelete(file.key)}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-slate-12 rounded-lg transition-colors"
+                      className="px-4 py-2 bg-red-600/70 hover:bg-red-700 text-slate-12 rounded-lg transition-colors"
                     >
                       Delete
                     </button>
