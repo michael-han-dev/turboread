@@ -123,7 +123,19 @@ const parseFileContent = async (buffer: Buffer, filename: string): Promise<strin
     
     case 'txt':
       try {
-        return buffer.toString('utf-8').replace(/\s+/g, ' ').trim();
+        let text = buffer.toString('utf-8');
+        
+        if (text.startsWith('{\\rtf')) {
+          text = text
+            .replace(/\{\\rtf[\d]+.*?\}/, '')
+            .replace(/\{[^}]*\}/g, '')
+            .replace(/\\[a-zA-Z]+[\d]*\s?/g, ' ')
+            .replace(/\\[^a-zA-Z]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        }
+        
+        return text.replace(/\s+/g, ' ').trim();
       } catch (error) {
         throw new Error(`Failed to parse text file: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -169,6 +181,14 @@ const app = new Elysia()
     throw new Error(`File limit reached. Maximum ${FILE_LIMIT} files allowed.`);
   }
 
+  // Validate file type
+  const extension = query.filename.split('.').pop()?.toLowerCase();
+  const allowedExtensions = ['pdf', 'txt'];
+  
+  if (!extension || !allowedExtensions.includes(extension)) {
+    throw new Error(`Invalid file type. Only PDF and TXT files are allowed. Received: ${extension || 'unknown'}`);
+  }
+
   // Generate a unique key to avoid conflicts
   const timestamp = Date.now();
   const sanitizedFilename = query.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -195,6 +215,14 @@ const app = new Elysia()
 
   if (user.fileCount >= FILE_LIMIT) {
     throw new Error(`File limit reached. Maximum ${FILE_LIMIT} files allowed.`);
+  }
+
+  // Validate file type again for security
+  const extension = body.filename.split('.').pop()?.toLowerCase();
+  const allowedExtensions = ['pdf', 'txt'];
+  
+  if (!extension || !allowedExtensions.includes(extension)) {
+    throw new Error(`Invalid file type. Only PDF and TXT files are allowed. Received: ${extension || 'unknown'}`);
   }
 
   // Insert file record

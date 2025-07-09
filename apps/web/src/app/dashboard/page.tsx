@@ -79,6 +79,15 @@ export default function Dashboard() {
       return
     }
 
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    const allowedExtensions = ['pdf', 'txt']
+    
+    if (!extension || !allowedExtensions.includes(extension)) {
+      setError(`Invalid file type. Only PDF and TXT files are allowed. Selected file: ${file.name}`)
+      e.target.value = ''
+      return
+    }
+
     setUploading(true)
     setError(null)
     
@@ -128,9 +137,12 @@ export default function Dashboard() {
       await fetchFiles()
       await fetchFileStats()
       
+      e.target.value = ''
+      
     } catch (error) {
       console.error('Upload failed:', error)
       setError(error instanceof Error ? error.message : 'Upload failed')
+      e.target.value = ''
     } finally {
       setUploading(false)
     }

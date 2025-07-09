@@ -24,6 +24,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [wpm, setWpm] = useState(300);
+  const [rawWpmInput, setRawWpmInput] = useState('300');
   const [wordsPerDisplay, setWordsPerDisplay] = useState(1);
   
   // HUD position and movement
@@ -110,7 +111,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       // Only handle arrow keys when HUD is focused or no other input is focused
       if (document.activeElement?.tagName === 'INPUT') return;
       
-      const moveDistance = 10;
+      const moveDistance = 20;
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
@@ -150,10 +151,21 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
 
   const handleWpmChange = (value: number) => {
     setWpm(Math.max(50, Math.min(1000, value))); 
+    setRawWpmInput(value.toString());
+  };
+
+  const handleWpmInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    setRawWpmInput(inputValue);
+
+    const numValue = Number(inputValue);
+    if (!isNaN(numValue)) {
+      setWpm(Math.max(50, Math.min(1000, numValue)));
+    }
   };
 
   const handleWordsPerDisplayChange = (value: number) => {
-    setWordsPerDisplay(Math.max(1, Math.min(10, value)));
+    setWordsPerDisplay(Math.max(1, Math.min(7, value)));
   };
 
   // Get current words to display
@@ -198,7 +210,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     <div 
       ref={hudRef}
       className="fixed bg-gray-900/80 backdrop-blur-sm rounded-lg p-4 text-white shadow-2xl border border-gray-600 select-none"
-      style={{ left: position.x, top: position.y, width: '320px', minHeight: '280px' }}
+      style={{ left: position.x, top: position.y, width: '320px', height: '380px' }}
       tabIndex={0}
     >
       {/* Header */}
@@ -213,9 +225,16 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       </div>
 
       {/* Word Display Area */}
-      <div className="bg-black/50 rounded-lg p-6 mb-4 min-h-[80px] flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-xl font-mono text-green-400 mb-2">
+      <div className="bg-black/50 rounded-lg p-6 mb-4 h-[120px] flex items-center justify-center overflow-hidden">
+        <div className="text-center w-full">
+          <div className="text-xl font-mono text-green-400 mb-2 break-words overflow-hidden text-ellipsis" style={{
+            fontSize: wordsPerDisplay > 3 ? '1rem' : '1.25rem',
+            lineHeight: '1.4',
+            maxHeight: '4.2em',
+            display: '-webkit-box',
+            WebkitLineClamp: '3',
+            WebkitBoxOrient: 'vertical'
+          }}>
             {getCurrentWords() || 'Ready to read...'}
           </div>
           <div className="text-sm text-gray-400">
@@ -242,8 +261,11 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
               type="number"
               min="50"
               max="1000"
-              value={wpm}
-              onChange={(e) => handleWpmChange(Number(e.target.value))}
+              value={rawWpmInput}
+              onChange={handleWpmInputChange}
+              onBlur={() => {
+                setRawWpmInput(wpm.toString());
+              }}
               className="w-16 px-2 py-1 bg-gray-700 rounded text-white text-sm text-center"
             />
           </div>

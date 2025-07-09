@@ -21,16 +21,29 @@ interface FileResponse {
   downloadUrl: string;
 }
 
+interface ParsedFileResponse {
+  file: FileData;
+  parsedText: string;
+  wordCount: number;
+  cached: boolean;
+}
+
 export default function FilePage() {
   const params = useParams();
   const router = useRouter();
   const { data: session } = useSession();
   const [fileData, setFileData] = useState<FileResponse | null>(null);
+  const [parsedContent, setParsedContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showHUD, setShowHUD] = useState(false);
 
   const fileId = params.id as string;
+
+  const getFileType = (filename: string) => {
+    const extension = filename.split('.').pop()?.toLowerCase();
+    return extension;
+  };
 
   useEffect(() => {
     if (!session) {
@@ -44,6 +57,16 @@ export default function FilePage() {
         if (!response.ok) throw new Error('File not found');
         const data = await response.json();
         setFileData(data);
+
+        // For txt files, also fetch parsed content for display
+        const fileType = getFileType(data.file.filename);
+        if (fileType === 'txt') {
+          const parsedResponse = await fetch(`http://localhost:3001/file/${fileId}/parsed`);
+          if (parsedResponse.ok) {
+            const parsedData: ParsedFileResponse = await parsedResponse.json();
+            setParsedContent(parsedData.parsedText);
+          }
+        }
       } catch (error) {
         console.error('Error fetching file:', error);
         setError(error instanceof Error ? error.message : 'Failed to load file');
@@ -54,11 +77,6 @@ export default function FilePage() {
 
     fetchFile();
   }, [fileId, session, router]);
-
-  const getFileType = (filename: string) => {
-    const extension = filename.split('.').pop()?.toLowerCase();
-    return extension;
-  };
 
   const renderFileContent = () => {
     if (!fileData) return null;
@@ -78,11 +96,13 @@ export default function FilePage() {
         );
       case 'txt':
         return (
-          <iframe
-            src={downloadUrl}
-            className="w-full h-full border-0 bg-white p-4"
-            title={fileData.file.filename}
-          />
+          <div className="w-full h-full p-8 bg-white text-black overflow-auto" style={{ height: 'calc(100vh - 73px)' }}>
+            <div className="max-w-4xl mx-auto">
+              <pre className="whitespace-pre-wrap font-sans text-base leading-relaxed">
+                {parsedContent || 'Loading text content...'}
+              </pre>
+            </div>
+          </div>
         );
     }
   };
