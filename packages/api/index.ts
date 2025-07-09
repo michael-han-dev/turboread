@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { cors } from "@elysiajs/cors";
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -24,6 +24,31 @@ const runMigrations = async () => {
 
 runMigrations().catch(console.error);
 
+// Configure S3 CORS
+const configureCORS = async () => {
+  const corsParams = {
+    Bucket: process.env.S3_BUCKET_NAME,
+    CORSConfiguration: {
+      CORSRules: [
+        {
+          AllowedHeaders: ['*'],
+          AllowedMethods: ['GET', 'PUT', 'POST', 'DELETE'],
+          AllowedOrigins: ['http://localhost:3000'],
+          ExposeHeaders: ['ETag'],
+          MaxAgeSeconds: 3600
+        }
+      ]
+    }
+  };
+  
+  try {
+    await s3.send(new PutBucketCorsCommand(corsParams));
+    console.log('S3 CORS configured success');
+  } catch (error) {
+    console.error('❌ Failed to configure S3 CORS automatically:', error);
+  }
+};
+
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -31,6 +56,9 @@ const s3 = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   }
 });
+
+// Configure S3 CORS after S3 client is initialized
+configureCORS().catch(console.error);
 
 // Helper function to ensure user exists
 const ensureUser = async (userId: string) => {
@@ -40,7 +68,6 @@ const ensureUser = async (userId: string) => {
     .where(eq(users.id, userId));
 
   if (!existingUser[0]) {
-    // Create user with default values
     await db.insert(users).values({
       id: userId,
       email: `user_${userId}@example.com`,
@@ -54,7 +81,7 @@ const ensureUser = async (userId: string) => {
 
 const app = new Elysia()
 .use(cors({
-  origin: 'http://localhost:3000', // Your frontend URL
+  origin: 'http://localhost:3000',
   credentials: true
 }))
 .get('/', () => {
