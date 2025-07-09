@@ -111,13 +111,18 @@ const app = new Elysia()
     throw new Error(`File limit reached. Maximum ${FILE_LIMIT} files allowed.`);
   }
 
+  // Generate a unique key to avoid conflicts
+  const timestamp = Date.now();
+  const sanitizedFilename = query.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const key = `${query.userId}/${timestamp}_${sanitizedFilename}`;
+  
   const command = new PutObjectCommand({
     Bucket: process.env.S3_BUCKET_NAME,
-    Key: query.filename,
+    Key: key,
     ContentType: query.type,
   });
   const url = await getSignedUrl(s3, command, { expiresIn: 60 });
-  return { url };
+  return { url, key };
 }, {
   query: t.Object({
     filename: t.String(),
@@ -200,6 +205,19 @@ const app = new Elysia()
   })
 })
 
+.get('/file/open/:key', async ({ params }) => {
+  const file = await db
+    .select()
+    .from(files)
+    .where(eq(files.key, params.key));
+
+  if (!file[0]){
+    throw new Error('File not found');
+  }
+
+  return { file: file[0] };
+})
+
 // Delete a file from S3 and DB
 .delete('/file', async ({ query }) => {
   // Get file info first to find the user
@@ -225,7 +243,6 @@ const app = new Elysia()
     .delete(files)
     .where(eq(files.key, query.key));
 
-  // Decrement user file count
   const user = await db
     .select({ fileCount: users.fileCount })
     .from(users)
