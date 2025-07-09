@@ -9,6 +9,15 @@ export const files = pgTable('files', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export const parsedFiles = pgTable('parsed_files', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  fileId: uuid('file_id').notNull().references(() => files.id, { onDelete: 'cascade' }),
+  parsedText: text('parsed_text').notNull(),
+  wordCount: integer('word_count').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // NextAuth.js Tables
 export const users = pgTable("user", {
   id: text("id").notNull().primaryKey(),

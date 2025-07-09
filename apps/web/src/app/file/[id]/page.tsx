@@ -4,6 +4,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Book } from "lucide-react";
+import SpeedReaderHUD from "../../../components/speed-reader-hud";
+import ErrorBoundary from "../../../components/error-boundary";
 
 interface FileData {
   id: string;
@@ -26,6 +28,7 @@ export default function FilePage() {
   const [fileData, setFileData] = useState<FileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showHUD, setShowHUD] = useState(false);
 
   const fileId = params.id as string;
 
@@ -131,6 +134,7 @@ export default function FilePage() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowHUD(true)}
               className="px-4 py-2 bg-purple-600/70 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <Book className="w-4 h-4" />
@@ -144,6 +148,16 @@ export default function FilePage() {
       <div className="flex-1">
         {renderFileContent()}
       </div>
+
+      {/* Speed Reader HUD */}
+      {showHUD && (
+        <ErrorBoundary>
+          <SpeedReaderHUD 
+            fileId={fileId} 
+            onClose={() => setShowHUD(false)} 
+          />
+        </ErrorBoundary>
+      )}
     </div>
   );
 } 
