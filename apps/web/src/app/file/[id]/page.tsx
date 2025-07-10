@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Book } from "lucide-react";
+import { Footer } from "@/components/footer";
 import SpeedReaderHUD from "../../../components/speed-reader-hud";
 import ErrorBoundary from "../../../components/error-boundary";
 
@@ -91,12 +92,12 @@ export default function FilePage() {
             src={downloadUrl}
             className="w-full h-full"
             title={fileData.file.filename}
-            style={{ height: 'calc(100vh - 73px)' }}
+            style={{ height: 'calc(100vh - 73px - 80px)' }}
           />
         );
       case 'txt':
         return (
-          <div className="w-full h-full p-8 bg-white text-black overflow-auto" style={{ height: 'calc(100vh - 73px)' }}>
+          <div className="w-full h-full p-8 bg-white text-black overflow-auto" style={{ height: 'calc(100vh - 73px - 80px)' }}>
             <div className="max-w-4xl mx-auto">
               <pre className="whitespace-pre-wrap font-sans text-base leading-relaxed">
                 {parsedContent || 'Loading text content...'}
@@ -132,7 +133,7 @@ export default function FilePage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col">
+    <div className="min-h-screen w-full flex flex-col bg-white/10 dark:bg-slate-900/50 shadow-2xl">
       {/* Header */}
       <div className="bg-white/10 backdrop-blur-md border-b border-white/20">
         <div className="mx-auto px-4 py-4 flex items-center justify-between w-full">
@@ -142,7 +143,7 @@ export default function FilePage() {
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
               <svg className="w-5 h-5 text-slate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />   
               </svg>
             </button>
             <div>
@@ -157,7 +158,7 @@ export default function FilePage() {
               onClick={() => setShowHUD(true)}
               className="px-4 py-2 bg-purple-600/70 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
             >
-              <Book className="w-4 h-4" />
+            <Book className="w-4 h-4" />
               Read
             </button>
           </div>
@@ -178,6 +179,7 @@ export default function FilePage() {
           />
         </ErrorBoundary>
       )}
+      <Footer />
     </div>
   );
 } 
