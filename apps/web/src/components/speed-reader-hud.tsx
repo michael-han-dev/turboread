@@ -19,7 +19,6 @@ interface ParsedFileResponse {
 }
 
 export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps) {
-  // Core state
   const [words, setWords] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -32,9 +31,53 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Refs for cleanup and keyboard handling
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const hudRef = useRef<HTMLDivElement>(null);
+
+  // Mouse drag handlers
+  const handleDrag = useCallback((e: React.MouseEvent) => {
+    const offset = { x: e.clientX - position.x, y: e.clientY - position.y };
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const x = Math.max(0, Math.min(window.innerWidth - 320, e.clientX - offset.x));
+      const y = Math.max(0, Math.min(window.innerHeight - 400, e.clientY - offset.y));
+      setPosition({ x, y });
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+    }, { once: true });
+  }, [position]);
+
+  // Control functions
+  const handlePlayPause = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleReset = () => {
+    setIsPlaying(false);
+    setCurrentIndex(0);
+  };
+
+  const updateWpm = useCallback((value: number) => {
+    const clamped = Math.max(50, Math.min(1000, value));
+    setWpm(clamped);
+    setRawWpmInput(clamped.toString());
+  }, []);
+
+  const handleWpmInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    setRawWpmInput(inputValue);
+
+    const numValue = Number(inputValue);
+    if (!isNaN(numValue)) {
+      setWpm(numValue);
+    }
+  };
+
+  const handleWordsPerDisplayChange = useCallback((value: number) => {
+    setWordsPerDisplay(Math.max(1, Math.min(10, value)));
+  }, []);
 
   // Suppress extension-related console errors
   useEffect(() => {
@@ -108,10 +151,9 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   // Keyboard controls for HUD movement
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle arrow keys when HUD is focused or no other input is focused
       if (document.activeElement?.tagName === 'INPUT') return;
       
-      const moveDistance = 20;
+      const moveDistance = 25;
       switch (e.key) {
         case 'ArrowUp':
           e.preventDefault();
@@ -129,6 +171,22 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
           e.preventDefault();
           setPosition(prev => ({ ...prev, x: Math.min(window.innerWidth - 300, prev.x + moveDistance) }));
           break;
+        case 'a':
+          e.preventDefault();
+          updateWpm(Math.max(50, wpm - 10));
+          break;
+        case 'd':
+          e.preventDefault();
+          updateWpm(Math.min(1000, wpm + 10));
+          break;
+        case 'h':
+          e.preventDefault();
+          handleWordsPerDisplayChange(Math.max(1, wordsPerDisplay - 1));
+          break;
+        case 'k':
+          e.preventDefault();
+          handleWordsPerDisplayChange(Math.min(10, wordsPerDisplay + 1));
+          break;
         case 'Escape':
           onClose();
           break;
@@ -137,46 +195,26 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, wpm, wordsPerDisplay, updateWpm, handleWordsPerDisplayChange]);
 
-  // Control functions
-  const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
-  };
+  // Global hotkey for play/pause
+  useEffect(() => {
+    const handleSpaceBar = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        e.preventDefault();
+        handlePlayPause();
+      }
+    };
 
-  const handleReset = () => {
-    setIsPlaying(false);
-    setCurrentIndex(0);
-  };
+    window.addEventListener('keydown', handleSpaceBar);
+    return () => window.removeEventListener('keydown', handleSpaceBar);
+  }, [handlePlayPause]);
 
-  const handleWpmChange = (value: number) => {
-    setWpm(Math.max(50, Math.min(1000, value))); 
-    setRawWpmInput(value.toString());
-  };
-
-  const handleWpmInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    setRawWpmInput(inputValue);
-
-    const numValue = Number(inputValue);
-    if (!isNaN(numValue)) {
-      setWpm(Math.max(50, Math.min(1000, numValue)));
-    }
-  };
-
-  const handleWordsPerDisplayChange = (value: number) => {
-    setWordsPerDisplay(Math.max(1, Math.min(7, value)));
-  };
-
-  // Get current words to display
-  const getCurrentWords = () => {
-    return words.slice(currentIndex, currentIndex + wordsPerDisplay).join(' ');
-  };
+  const wordsToDisplay = words.slice(currentIndex, currentIndex + wordsPerDisplay).join(' ');
 
   if (loading) {
     return (
       <div 
-        className="fixed bg-gray-900/80 backdrop-blur-sm rounded-lg p-6 text-white shadow-2xl border border-gray-600"
         style={{ left: position.x, top: position.y, width: '300px', height: '200px' }}
       >
         <div className="flex items-center justify-center h-full">
@@ -208,14 +246,25 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
 
   return (
     <div 
-      ref={hudRef}
-      className="fixed bg-gray-900/80 backdrop-blur-sm rounded-lg p-4 text-white shadow-2xl border border-gray-600 select-none"
-      style={{ left: position.x, top: position.y, width: '320px', height: '380px' }}
+      className="fixed bg-gray-900/50 rounded-lg p-4 text-white shadow-2xl border border-gray-600 select-none cursor-move"
+      style={{ left: position.x, top: position.y, width: '320px', height: '400px' }}
       tabIndex={0}
+      onMouseDown={(e) => {
+        if (
+          e.target instanceof Element && 
+          (e.target.closest('button') || 
+           e.target.closest('input') || 
+           e.target.closest('select') || 
+           e.target.closest('label'))
+        ) return;
+        handleDrag(e);
+      }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Speed Reader</h3>
+      <div 
+        className="flex items-center justify-between mb-4"
+      >
+        <h3 className="text-lg font-bold">Speed Reader</h3>
         <button 
           onClick={onClose}
           className="text-white hover:text-gray-300 transition-colors"
@@ -225,9 +274,9 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       </div>
 
       {/* Word Display Area */}
-      <div className="bg-black/50 rounded-lg p-6 mb-4 h-[120px] flex items-center justify-center overflow-hidden">
+      <div className="bg-black/25 rounded-lg p-6 mb-4 h-[120px] flex items-center justify-center overflow-hidden">
         <div className="text-center w-full">
-          <div className="text-xl font-mono text-green-400 mb-2 break-words overflow-hidden text-ellipsis" style={{
+          <div className="text-xl font-mono text-green-400 mb-2 break-words overflow-hidden text-ellipsis font-bold" style={{
             fontSize: wordsPerDisplay > 3 ? '1rem' : '1.25rem',
             lineHeight: '1.4',
             maxHeight: '4.2em',
@@ -235,36 +284,50 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
             WebkitLineClamp: '3',
             WebkitBoxOrient: 'vertical'
           }}>
-            {getCurrentWords() || 'Ready to read...'}
+            {wordsToDisplay || 'Ready to read...'}
           </div>
-          <div className="text-sm text-gray-400">
-            {words.length > 0 && `${currentIndex + 1}-${Math.min(currentIndex + wordsPerDisplay, words.length)} of ${words.length} words`}
+          <div className="text-sm text-gray-400 font-bold">
+            {words.length > 0 && `${Math.min(currentIndex + wordsPerDisplay, words.length)} of ${words.length} words`}
           </div>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="space-y-3">
+      <div className="space-y-3 flex flex-col h-[calc(100%-180px)]">
         {/* WPM Control */}
         <div>
-          <label className="block text-sm text-gray-300 mb-1">Words Per Minute</label>
+          <label className="block text-sm text-gray-300 mb-1 font-bold">Words Per Minute (A/D)</label>
           <div className="flex items-center gap-2">
             <input
               type="range"
               min="50"
               max="1000"
               value={wpm}
-              onChange={(e) => handleWpmChange(Number(e.target.value))}
+              onChange={(e) => updateWpm(Number(e.target.value))}
               className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
             />
             <input
               type="number"
-              min="50"
-              max="1000"
               value={rawWpmInput}
               onChange={handleWpmInputChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const num = Number(rawWpmInput);
+                  if (!isNaN(num)) {
+                    updateWpm(num);
+                  } else {
+                    setRawWpmInput(wpm.toString());
+                  }
+                  e.currentTarget.blur();
+                }
+              }}
               onBlur={() => {
-                setRawWpmInput(wpm.toString());
+                const num = Number(rawWpmInput);
+                if (!isNaN(num)) {
+                  updateWpm(num);
+                } else {
+                  setRawWpmInput(wpm.toString());
+                }
               }}
               className="w-16 px-2 py-1 bg-gray-700 rounded text-white text-sm text-center"
             />
@@ -273,7 +336,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
 
         {/* Words Per Display */}
         <div>
-          <label className="block text-sm text-gray-300 mb-1">Words Per Display</label>
+          <label className="block text-sm text-gray-300 mb-1 font-bold">Words Per Display (H/K)</label>
           <div className="flex items-center gap-2">
             <input
               type="range"
@@ -288,7 +351,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
         </div>
 
         {/* Control Buttons */}
-        <div className="flex items-center justify-center gap-2 pt-2">
+        <div className="flex items-center justify-center gap-2">
           <button
             onClick={handlePlayPause}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
@@ -307,11 +370,11 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
             Reset
           </button>
         </div>
-      </div>
 
-      {/* Instructions */}
-      <div className="mt-3 text-xs text-gray-400 text-center">
-        Use arrow keys to move • ESC to close
+        {/* Instructions */}
+        <div className="text-sm text-white/70 text-center mt-auto pb-2 font-bold">
+          mouse or arrow keys to move • ESC to close
+        </div>
       </div>
     </div>
   );
