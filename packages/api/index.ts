@@ -125,7 +125,7 @@ const parseFileContent = async (buffer: Buffer, filename: string): Promise<strin
     case 'txt':
       try {
         let text = buffer.toString('utf-8');
-        
+        //remove the rtf tags if presentz
         if (text.startsWith('{\\rtf')) {
           text = text
             .replace(/\{\\rtf[\d]+.*?\}/, '')
@@ -140,7 +140,6 @@ const parseFileContent = async (buffer: Buffer, filename: string): Promise<strin
       } catch (error) {
         throw new Error(`Failed to parse text file: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-    
     default:
       throw new Error(`Unsupported file type: ${extension}`);
   }
