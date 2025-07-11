@@ -41,6 +41,10 @@ module.exports = {
           to: 'manifest.json' 
         },
         {
+          from: 'src/content.css',
+          to: 'content.css'
+        },
+        {
           from: 'src/icons',
           to: 'icons',
           noErrorOnMissing: true
