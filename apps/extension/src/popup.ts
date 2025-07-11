@@ -1,8 +1,6 @@
 interface Settings {
   wpm: number;
   wordsPerDisplay: number;
-  voiceMode: 'visual' | 'voice';
-  vapiPublicKey?: string;
 }
 
 interface MessageData {
@@ -14,8 +12,7 @@ interface MessageData {
 class PopupController {
   private settings: Settings = {
     wpm: 300,
-    wordsPerDisplay: 1,
-    voiceMode: 'visual'
+    wordsPerDisplay: 1
   };
 
   constructor() {
@@ -56,7 +53,6 @@ class PopupController {
     // Settings inputs
     const wpmInput = document.getElementById('wpmSetting') as HTMLInputElement;
     const wordsInput = document.getElementById('wordsSetting') as HTMLInputElement;
-    const voiceToggle = document.getElementById('voiceToggle') as HTMLButtonElement;
 
     // Button event listeners
     activateBtn?.addEventListener('click', () => this.activateSpeedReader());
@@ -76,27 +72,16 @@ class PopupController {
       this.saveSettings();
     });
 
-    voiceToggle?.addEventListener('click', () => {
-      this.settings.voiceMode = this.settings.voiceMode === 'visual' ? 'voice' : 'visual';
-      this.saveSettings();
-      this.updateUI();
-    });
+
   }
 
   private updateUI(): void {
     // Update input values
     const wpmInput = document.getElementById('wpmSetting') as HTMLInputElement;
     const wordsInput = document.getElementById('wordsSetting') as HTMLInputElement;
-    const voiceToggle = document.getElementById('voiceToggle') as HTMLButtonElement;
 
     if (wpmInput) wpmInput.value = this.settings.wpm.toString();
     if (wordsInput) wordsInput.value = this.settings.wordsPerDisplay.toString();
-    if (voiceToggle) {
-      voiceToggle.textContent = this.settings.voiceMode === 'voice' ? 'Voice' : 'Visual';
-      voiceToggle.style.background = this.settings.voiceMode === 'voice' 
-        ? 'rgba(147, 51, 234, 0.3)' 
-        : 'rgba(255, 255, 255, 0.2)';
-    }
   }
 
   private async sendMessageToContentScript(message: MessageData): Promise<void> {

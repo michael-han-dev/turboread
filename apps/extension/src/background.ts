@@ -1,15 +1,12 @@
 interface Settings {
   wpm: number;
   wordsPerDisplay: number;
-  voiceMode: 'visual' | 'voice';
-  vapiPublicKey?: string;
 }
 
 class BackgroundController {
   private defaultSettings: Settings = {
     wpm: 300,
-    wordsPerDisplay: 1,
-    voiceMode: 'visual'
+    wordsPerDisplay: 1
   };
 
   constructor() {

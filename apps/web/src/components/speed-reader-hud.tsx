@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Pause, RotateCcw, X, Volume2, VolumeX, Mic, MicOff } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, Volume2, VolumeX } from 'lucide-react';
 import Vapi from '@vapi-ai/web';
 
 interface SpeedReaderHUDProps {
@@ -18,9 +18,9 @@ interface ParsedFileResponse {
   wordCount: number;
   cached: boolean;
 }
-//type safety
+
 type VoiceMode = 'visual' | 'voice';
-type VoiceStatus = 'idle' | 'connecting' | 'speaking' | 'error';
+type VoiceStatus = 'idle' | 'speaking' | 'error';
 
 export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps) {
   const [words, setWords] = useState<string[]>([]);
@@ -40,7 +40,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
-  const textToSpeakRef = useRef<string>('');
+  const isVapiInitialized = useRef(false);
 
   const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
 
@@ -61,129 +61,97 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
 
   useEffect(() => {
     if (!VAPI_PUBLIC_KEY) {
-      console.warn('Vapi public key not found. Voice mode will be disabled.');
+      setVoiceError('Vapi key not configured');
       return;
     }
 
-    try {
-      const vapi = new Vapi(VAPI_PUBLIC_KEY);
-      vapiRef.current = vapi;
+    const vapi = new Vapi(VAPI_PUBLIC_KEY);
+    vapiRef.current = vapi;
 
-      // set Vapi event listeners
-      vapi.on('call-start', () => {
-        console.log('Voice call started');
-        setVoiceStatus('speaking');
-        setVoiceError(null);
-      });
+    vapi.on('call-start', () => {
+      isVapiInitialized.current = true;
+      setVoiceStatus('speaking');
+      setVoiceError(null);
+    });
 
-      vapi.on('call-end', () => {
-        console.log('Voice call ended');
-        setVoiceStatus('idle');
-        setIsPlaying(false);
-      });
+    vapi.on('call-end', () => {
+      isVapiInitialized.current = false;
+      setVoiceStatus('idle');
+      setIsPlaying(false);
+    });
 
-      vapi.on('speech-start', () => {
-        console.log('Speech started');
-        setVoiceStatus('speaking');
-      });
+    vapi.on('speech-start', () => {
+      setVoiceStatus('speaking');
+    });
 
-      vapi.on('speech-end', () => {
-        console.log('Speech ended');
-      });
+    vapi.on('speech-end', () => {
+      setVoiceStatus('idle');
+      setIsPlaying(false);
+    });
 
-      vapi.on('error', (error: Error) => {
-        console.error('Vapi error:', error);
-        setVoiceError(error.message);
-        setVoiceStatus('error');
-        setIsPlaying(false);
-      });
-
-      vapi.on('message', (message: any) => {
-        console.log('Vapi message:', message);
-      });
-
-    } catch (error) {
-      console.error('Failed to initialize Vapi:', error);
-      setVoiceError('Failed to initialize voice functionality');
-    }
+    vapi.on('error', (error: Error) => {
+      setVoiceError(error.message);
+      setVoiceStatus('error');
+      setIsPlaying(false);
+    });
 
     return () => {
       if (vapiRef.current) {
-        try {
-          vapiRef.current.stop();
-        } catch (error) {
-          console.error('Error stopping Vapi:', error);
-        }
+        vapiRef.current.stop();
         vapiRef.current = null;
       }
     };
   }, [VAPI_PUBLIC_KEY]);
 
-  // Voice mode functions
   const startVoiceReading = useCallback(async () => {
     if (!vapiRef.current || words.length === 0) {
-      setVoiceError('Voice functionality not available');
+      setVoiceError('Voice not available');
       return;
     }
 
     try {
-      setVoiceStatus('connecting');
       setVoiceError(null);
-
       const textToSpeak = words.slice(currentIndex).join(' ');
-      textToSpeakRef.current = textToSpeak;
 
-      const voiceConfig = {
-        provider: "openai" as const,
-        voiceId: "alloy",
-        speed: Math.min(1.5, Math.max(0.5, wpm / 200))
-      };
+      if (!isVapiInitialized.current) {
+        await vapiRef.current.start({
+          model: {
+            provider: "openai",
+            model: "gpt-4o-mini",
+            messages: [{ role: "system", content: "You only speak when told to say something." }]
+          },
+          voice: {
+            provider: "openai",
+            voiceId: "alloy"
+          }
+        });
+      }
 
-       await vapiRef.current.start({
-         name: "TTS Reader",
-         firstMessage: textToSpeak,
-         model: {
-           provider: "openai" as const,
-           model: "gpt-4o-mini" as const,
-           temperature: 0,
-           messages: [
-             {
-               role: "system" as const,
-               content: "You are a speed text reader. Simply read the provided text exactly as written without any commentary or additions."
-             }
-           ]
-         },
-         voice: voiceConfig
-       });
+      await vapiRef.current.say(textToSpeak, true);
       
     } catch (error) {
-      console.error('Error starting voice reading:', error);
-      setVoiceError('Failed to start voice reading');
+      setVoiceError('Failed to start voice');
       setVoiceStatus('error');
     }
-  }, [words, currentIndex, wpm]);
+  }, [words, currentIndex]);
 
   const stopVoiceReading = useCallback(async () => {
     if (!vapiRef.current) return;
-
     try {
       await vapiRef.current.stop();
-      setVoiceStatus('idle');
     } catch (error) {
-      console.error('Error stopping voice reading:', error);
-      setVoiceError('Failed to stop voice reading');
+      setVoiceError('Failed to stop voice');
     }
   }, []);
 
   const toggleVoiceMute = useCallback(() => {
     if (!vapiRef.current) return;
-
     try {
       const newMutedState = !isVoiceMuted;
       vapiRef.current.setMuted(newMutedState);
       setIsVoiceMuted(newMutedState);
     } catch (error) {
-      console.error('Error toggling voice mute:', error);
+      setVoiceError('Failed to toggle mute');
     }
   }, [isVoiceMuted]);
 
@@ -233,7 +201,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   const handleWpmInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     setRawWpmInput(inputValue);
-
     const numValue = Number(inputValue);
     if (!isNaN(numValue)) {
       setWpm(numValue);
@@ -244,7 +211,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     setWordsPerDisplay(Math.max(1, Math.min(10, value)));
   }, []);
 
-  // Suppress extension-related console errors (unchanged)
   useEffect(() => {
     const originalConsoleError = console.error;
     console.error = (...args) => {
@@ -257,7 +223,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       }
       originalConsoleError.apply(console, args);
     };
-
     return () => {
       console.error = originalConsoleError;
     };
@@ -283,7 +248,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     fetchParsedText();
   }, [fileId]);
 
-  // Visual mode speed reading timer logic (only for visual mode)
   useEffect(() => {
     if (voiceMode === 'visual' && isPlaying && words.length > 0) {
       const delay = 60000 / wpm; 
@@ -311,7 +275,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     };
   }, [voiceMode, isPlaying, wpm, wordsPerDisplay, words.length]);
 
-  // keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT') return;
@@ -390,11 +353,9 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     ? words.slice(currentIndex, currentIndex + wordsPerDisplay).join(' ')
     : voiceStatus === 'speaking' 
       ? `Speaking: "${words.slice(currentIndex, currentIndex + 10).join(' ')}..."`
-      : voiceStatus === 'connecting'
-        ? 'Connecting to voice...'
-        : 'Ready for voice reading...';
-
-  const canUseVoice = VAPI_PUBLIC_KEY;
+      : voiceStatus === 'idle'
+        ? 'Ready for voice reading...'
+        : 'Voice error';
 
   if (loading) {
     return (
@@ -445,11 +406,10 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
         handleDrag(e);
       }}
     >
-      {/* Header with Voice Mode Toggle */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold">Speed Reader</h3>
         <div className="flex items-center gap-2">
-          {canUseVoice && (
+          {VAPI_PUBLIC_KEY && (
             <button
               onClick={toggleVoiceMode}
               className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
@@ -471,7 +431,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
         </div>
       </div>
 
-      {/* Word Display Area */}
       <div className={`rounded-lg p-6 mb-4 h-[120px] flex items-center justify-center overflow-hidden ${
         voiceMode === 'voice' ? 'bg-purple-900/25' : 'bg-black/25'
       }`}>
@@ -495,16 +454,13 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
         </div>
       </div>
 
-      {/* Voice Error Display */}
       {voiceError && (
         <div className="bg-red-900/50 rounded p-2 mb-3 text-sm text-red-200">
           Voice Error: {voiceError}
         </div>
       )}
 
-      {/* Controls */}
       <div className="space-y-3 flex flex-col h-[calc(100%-200px)]">
-        {/* WPM Control */}
         <div>
           <label className="block text-sm text-gray-300 mb-1 font-bold">
             {voiceMode === 'voice' ? 'Voice Speed (A/D)' : 'Words Per Minute (A/D)'}
@@ -546,7 +502,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
           </div>
         </div>
 
-        {/* Words Per Display (Visual Mode Only) */}
         {voiceMode === 'visual' && (
           <div>
             <label className="block text-sm text-gray-300 mb-1 font-bold">Words Per Display (H/K)</label>
@@ -564,24 +519,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
           </div>
         )}
 
-        {/* Voice Controls (Voice Mode Only) */}
-        {voiceMode === 'voice' && (
-          <div className="flex items-center justify-center gap-2">
-            <button
-              onClick={toggleVoiceMute}
-              className={`flex items-center gap-1 px-3 py-1 rounded text-sm transition-colors ${
-                isVoiceMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-              disabled={voiceStatus === 'idle'}
-              title="Toggle Voice Mute (M)"
-            >
-              {isVoiceMuted ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
-              {isVoiceMuted ? 'Muted' : 'Live'}
-            </button>
-          </div>
-        )}
-
-        {/* Control Buttons */}
         <div className="flex items-center justify-center gap-2">
           <button
             onClick={handlePlayPause}
@@ -590,7 +527,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
                 ? 'bg-purple-600 hover:bg-purple-700' 
                 : 'bg-green-600 hover:bg-green-700'
             }`}
-            disabled={words.length === 0 || (voiceMode === 'voice' && !canUseVoice)}
+            disabled={words.length === 0 || (voiceMode === 'voice' && !VAPI_PUBLIC_KEY)}
           >
             {(isPlaying || voiceStatus === 'speaking') ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             {(isPlaying || voiceStatus === 'speaking') ? 'Pause' : 'Play'}
@@ -606,7 +543,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
           </button>
         </div>
 
-        {/* Instructions */}
         <div className="text-sm text-white/70 text-center mt-auto pb-2 font-bold">
           {voiceMode === 'voice' 
             ? 'V: toggle mode • M: mute • ESC: close'

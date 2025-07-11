@@ -1,8 +1,6 @@
 interface Settings {
   wpm: number;
   wordsPerDisplay: number;
-  voiceMode: 'visual' | 'voice';
-  vapiPublicKey?: string;
 }
 
 interface MessageData {
@@ -11,26 +9,23 @@ interface MessageData {
   text?: string;
 }
 
-type VoiceStatus = 'idle' | 'connecting' | 'speaking' | 'error';
-
-interface TextNode {
-  node: Text;
-  text: string;
-  wordStart: number;
-  wordEnd: number;
+interface WordPosition {
+  word: string;
+  textNode: Text;
+  startOffset: number;
+  endOffset: number;
+  globalIndex: number;
 }
 
 class TurboReadSpeedReader {
   private words: string[] = [];
-  private textNodes: TextNode[] = [];
+  private wordPositions: WordPosition[] = [];
   private currentIndex: number = 0;
   private isPlaying: boolean = false;
   private settings: Settings;
   private position = { x: 100, y: 100 };
   private intervalRef: number | null = null;
   private container: HTMLElement | null = null;
-  private voiceStatus: VoiceStatus = 'idle';
-  private isVoiceMuted: boolean = false;
   private highlightElements: HTMLElement[] = [];
   private progressBar: HTMLElement | null = null;
 
@@ -41,12 +36,9 @@ class TurboReadSpeedReader {
 
   private init(): void {
     try {
-      this.createContainer();
+    this.createContainer();
       this.createProgressBar();
-      this.setupEventListeners();
-      if (this.settings.voiceMode === 'voice') {
-        this.initializeVapi();
-      }
+    this.setupEventListeners();
     } catch (error) {
       console.error('TurboRead initialization error:', error);
     }
@@ -71,64 +63,59 @@ class TurboReadSpeedReader {
   private getHTML(): string {
     return `
       <div class="turboread-hud">
-        <div class="header">
-          <h3>⚡ Speed Reader</h3>
-          <div class="header-controls">
-            ${this.settings.voiceMode === 'voice' ? 
-              '<button id="voice-mode-btn" class="mode-btn voice-mode">Voice</button>' : 
-              '<button id="voice-mode-btn" class="mode-btn visual-mode">Visual</button>'
-            }
-            <button id="close-btn" class="close-btn">×</button>
-          </div>
-        </div>
-        
-        <div class="word-display ${this.settings.voiceMode === 'voice' ? 'voice-display' : 'visual-display'}">
-          <div class="word-text">Ready to read...</div>
-          <div class="word-progress"></div>
-        </div>
-        
-        <div class="controls">
-          <div class="setting-row">
-            <label>Speed (WPM)</label>
-            <div class="input-group">
-              <input type="range" id="wpm-slider" min="50" max="1000" value="${this.settings.wpm}">
-              <input type="number" id="wpm-input" value="${this.settings.wpm}" min="50" max="1000">
-            </div>
-          </div>
-          
-          ${this.settings.voiceMode === 'visual' ? `
-            <div class="setting-row">
-              <label>Words per Display</label>
-              <div class="input-group">
-                <input type="range" id="words-slider" min="1" max="10" value="${this.settings.wordsPerDisplay}">
-                <span class="value-display">${this.settings.wordsPerDisplay}</span>
-              </div>
-            </div>
-          ` : ''}
-          
-          ${this.settings.voiceMode === 'voice' ? `
-            <div class="setting-row">
-              <button id="mute-btn" class="control-btn mute-btn">
-                🔊 Live
-              </button>
-            </div>
-          ` : ''}
-          
-          <div class="button-row">
-            <button id="play-btn" class="control-btn primary">
-              ▶️ Play
-            </button>
-            <button id="reset-btn" class="control-btn">
-              🔄 Reset
+        <div class="turboread-header">
+          <h3 class="turboread-title">Speed Reader</h3>
+          <div class="turboread-header-controls">
+            <button id="close-btn" class="turboread-close-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
             </button>
           </div>
         </div>
         
-        <div class="instructions">
-          ${this.settings.voiceMode === 'voice' ? 
-            'V: toggle mode • M: mute • ESC: close' : 
-            'V: voice mode • mouse/arrows: move • ESC: close'
-          }
+        <div class="turboread-word-display">
+          <div class="turboread-word-text">Ready to read...</div>
+          <div class="turboread-word-progress">0 of 0 words</div>
+        </div>
+        
+        <div class="turboread-controls">
+          <div class="turboread-setting-group">
+            <label class="turboread-setting-label">Words Per Minute (A/D)</label>
+            <div class="turboread-slider-container">
+              <input type="range" id="wpm-slider" min="50" max="1000" value="${this.settings.wpm}" class="turboread-slider">
+              <div class="turboread-slider-value">${this.settings.wpm}</div>
+            </div>
+          </div>
+          
+          <div class="turboread-setting-group">
+            <label class="turboread-setting-label">Words Per Display (H/K)</label>
+            <div class="turboread-slider-container">
+              <input type="range" id="words-slider" min="1" max="10" value="${this.settings.wordsPerDisplay}" class="turboread-slider">
+              <div class="turboread-slider-value">${this.settings.wordsPerDisplay}</div>
+            </div>
+          </div>
+          
+          <div class="turboread-button-container">
+            <button id="play-btn" class="turboread-btn turboread-btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5,3 19,12 5,21"></polygon>
+              </svg>
+              Play
+            </button>
+            <button id="reset-btn" class="turboread-btn turboread-btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1,4 1,10 7,10"></polyline>
+                <path d="M3.51,15a9,9,0,0,0,2.13,3.09,9,9,0,0,0,13.72,0,9,9,0,0,0,0-12.72,9,9,0,0,0-9.85-2"></path>
+              </svg>
+              Reset
+            </button>
+          </div>
+        </div>
+        
+        <div class="turboread-instructions">
+          Space: play/pause • mouse/arrows: move • ESC: close
         </div>
       </div>
     `;
@@ -150,223 +137,238 @@ class TurboReadSpeedReader {
       style.id = 'turboread-styles';
       style.textContent = `
         #turboread-speed-reader {
-          position: fixed;
-          z-index: 999999;
-          font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          user-select: none;
-          pointer-events: auto;
+          position: fixed !important;
+          z-index: 2147483647 !important;
+          font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+          user-select: none !important;
+          pointer-events: auto !important;
         }
         
         .turboread-hud {
-          width: 320px;
-          background: rgba(17, 24, 39, 0.95);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(75, 85, 99, 0.5);
-          border-radius: 12px;
-          padding: 16px;
-          color: white;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
-          cursor: move;
+          width: 320px !important;
+          background: rgba(15, 23, 42, 0.85) !important;
+          backdrop-filter: blur(12px) !important;
+          -webkit-backdrop-filter: blur(12px) !important;
+          border: 1px solid rgba(71, 85, 105, 0.3) !important;
+          border-radius: 16px !important;
+          padding: 20px !important;
+          color: white !important;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2) !important;
+          cursor: move !important;
+          font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
         }
         
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 16px;
+        .turboread-header {
+          display: flex !important;
+          justify-content: space-between !important;
+          align-items: center !important;
+          margin-bottom: 20px !important;
         }
         
-        .header h3 {
-          margin: 0;
-          font-family: 'Instrument Serif', serif;
-          font-size: 16px;
-          font-weight: 400;
-          letter-spacing: -0.48px;
+        .turboread-title {
+          margin: 0 !important;
+          font-family: 'Instrument Serif', serif !important;
+          font-size: 18px !important;
+          font-weight: 500 !important;
+          letter-spacing: -0.5px !important;
+          color: white !important;
         }
         
-        .header-controls {
-          display: flex;
-          gap: 8px;
-          align-items: center;
+        .turboread-header-controls {
+          display: flex !important;
+          gap: 8px !important;
         }
         
-        .mode-btn {
-          padding: 4px 8px;
-          border: none;
-          border-radius: 4px;
-          font-size: 11px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
+        .turboread-close-btn {
+          background: rgba(239, 68, 68, 0.15) !important;
+          border: 1px solid rgba(239, 68, 68, 0.3) !important;
+          color: rgb(248, 113, 113) !important;
+          width: 32px !important;
+          height: 32px !important;
+          border-radius: 8px !important;
+          cursor: pointer !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          transition: all 0.2s ease !important;
         }
         
-        .voice-mode {
-          background: rgba(147, 51, 234, 0.3);
-          color: #c4b5fd;
+        .turboread-close-btn:hover {
+          background: rgba(239, 68, 68, 0.25) !important;
+          border-color: rgba(239, 68, 68, 0.5) !important;
+          color: rgb(252, 165, 165) !important;
         }
         
-        .visual-mode {
-          background: rgba(75, 85, 99, 0.3);
-          color: #d1d5db;
+        .turboread-word-display {
+          min-height: 120px !important;
+          background: rgba(0, 0, 0, 0.25) !important;
+          border: 1px solid rgba(71, 85, 105, 0.2) !important;
+          border-radius: 12px !important;
+          padding: 24px !important;
+          margin-bottom: 24px !important;
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: center !important;
+          align-items: center !important;
+          text-align: center !important;
         }
         
-        .close-btn {
-          background: rgba(239, 68, 68, 0.2);
-          border: none;
-          color: #fca5a5;
-          width: 24px;
-          height: 24px;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 16px;
-          line-height: 1;
+        .turboread-word-text {
+          font-size: 24px !important;
+          font-weight: 700 !important;
+          margin-bottom: 12px !important;
+          min-height: 32px !important;
+          line-height: 1.2 !important;
+          word-wrap: break-word !important;
+          max-width: 100% !important;
+          color: rgb(34, 197, 94) !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
         }
         
-        .word-display {
-          min-height: 100px;
-          border-radius: 8px;
-          padding: 20px;
-          margin-bottom: 16px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          text-align: center;
+        .turboread-word-progress {
+          font-size: 14px !important;
+          color: rgba(255, 255, 255, 0.7) !important;
+          font-weight: 500 !important;
         }
         
-        .visual-display {
-          background: rgba(34, 197, 94, 0.1);
-          border: 1px solid rgba(34, 197, 94, 0.2);
+        .turboread-controls {
+          margin-bottom: 20px !important;
         }
         
-        .voice-display {
-          background: rgba(147, 51, 234, 0.1);
-          border: 1px solid rgba(147, 51, 234, 0.2);
-        }
-        
-        .word-text {
-          font-size: 24px;
-          font-weight: 700;
-          margin-bottom: 8px;
-          min-height: 32px;
-          line-height: 1.2;
-          word-wrap: break-word;
-          max-width: 100%;
-        }
-        
-        .word-progress {
-          font-size: 12px;
-          color: rgba(255, 255, 255, 0.7);
-        }
-        
-        .controls {
-          margin-bottom: 12px;
-        }
-        
-        .setting-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-        
-        .setting-row label {
-          font-size: 12px;
-          font-weight: 500;
-        }
-        
-        .input-group {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        
-        .input-group input[type="range"] {
-          width: 100px;
-        }
-        
-        .input-group input[type="number"] {
-          width: 50px;
-          padding: 2px 4px;
-          background: rgba(75, 85, 99, 0.3);
-          border: 1px solid rgba(75, 85, 99, 0.5);
-          border-radius: 4px;
-          color: white;
-          font-size: 11px;
-          text-align: center;
-        }
-        
-        .value-display {
-          font-size: 11px;
-          min-width: 20px;
-          text-align: center;
-        }
-        
-        .button-row {
-          display: flex;
-          gap: 8px;
-          justify-content: center;
-        }
-        
-        .control-btn {
-          padding: 8px 16px;
-          border: none;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          background: rgba(75, 85, 99, 0.3);
-          color: white;
-          border: 1px solid rgba(75, 85, 99, 0.5);
-        }
-        
-        .control-btn:hover {
-          background: rgba(75, 85, 99, 0.5);
-        }
-        
-        .control-btn.primary {
-          background: rgba(34, 197, 94, 0.3);
-          border-color: rgba(34, 197, 94, 0.5);
-          color: #86efac;
-        }
-        
-        .control-btn.primary:hover {
-          background: rgba(34, 197, 94, 0.5);
-        }
-        
-        .mute-btn {
-          width: 100%;
-          margin-bottom: 8px;
-        }
-        
-        .instructions {
-          text-align: center;
-          font-size: 10px;
-          color: rgba(255, 255, 255, 0.6);
-          font-weight: 500;
+        .turboread-setting-group {
+          margin-bottom: 20px !important;
         }
 
-        .reading-progress {
-          position: fixed;
-          top: 0;
-          left: 0;
-          height: 3px;
-          background: linear-gradient(90deg, #22c55e, #16a34a);
-          z-index: 1000000;
-          transition: width 0.3s ease;
-          box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+        .turboread-setting-label {
+          font-size: 14px !important;
+          font-weight: 600 !important;
+          color: rgba(255, 255, 255, 0.9) !important;
+          margin-bottom: 12px !important;
+          display: block !important;
+        }
+        
+        .turboread-slider-container {
+          display: flex !important;
+          align-items: center !important;
+          gap: 12px !important;
+        }
+        
+        .turboread-slider {
+          flex: 1 !important;
+          height: 6px !important;
+          background: rgba(71, 85, 105, 0.4) !important;
+          border-radius: 6px !important;
+          outline: none !important;
+          border: none !important;
+          cursor: pointer !important;
+          appearance: none !important;
+        }
+        
+        .turboread-slider::-webkit-slider-thumb {
+          appearance: none !important;
+          width: 18px !important;
+          height: 18px !important;
+          background: rgb(34, 197, 94) !important;
+          border-radius: 50% !important;
+          cursor: pointer !important;
+          border: 2px solid white !important;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+          transition: all 0.2s ease !important;
+        }
+        
+        .turboread-slider::-webkit-slider-thumb:hover {
+          background: rgb(22, 163, 74) !important;
+          transform: scale(1.1) !important;
+        }
+        
+        .turboread-slider-value {
+          font-size: 14px !important;
+          min-width: 45px !important;
+          text-align: center !important;
+          color: white !important;
+          font-weight: 600 !important;
+          background: rgba(71, 85, 105, 0.5) !important;
+          padding: 6px 10px !important;
+          border-radius: 8px !important;
+          border: 1px solid rgba(71, 85, 105, 0.3) !important;
+        }
+        
+        .turboread-button-container {
+          display: flex !important;
+          gap: 12px !important;
+          justify-content: center !important;
+          margin-top: 24px !important;
+        }
+        
+        .turboread-btn {
+          display: flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+          padding: 12px 18px !important;
+          border: none !important;
+          border-radius: 10px !important;
+          font-size: 14px !important;
+          font-weight: 600 !important;
+          cursor: pointer !important;
+          transition: all 0.2s ease !important;
+          flex: 1 !important;
+          justify-content: center !important;
+          border: 1px solid transparent !important;
+        }
+        
+        .turboread-btn-primary {
+          background: rgba(34, 197, 94, 0.9) !important;
+          color: white !important;
+          border-color: rgba(34, 197, 94, 0.3) !important;
+        }
+        
+        .turboread-btn-primary:hover {
+          background: rgb(34, 197, 94) !important;
+          border-color: rgba(34, 197, 94, 0.5) !important;
+          transform: translateY(-1px) !important;
+          box-shadow: 0 4px 8px rgba(34, 197, 94, 0.3) !important;
+        }
+        
+        .turboread-btn-secondary {
+          background: rgba(59, 130, 246, 0.9) !important;
+          color: white !important;
+          border-color: rgba(59, 130, 246, 0.3) !important;
+        }
+        
+        .turboread-btn-secondary:hover {
+          background: rgb(59, 130, 246) !important;
+          border-color: rgba(59, 130, 246, 0.5) !important;
+          transform: translateY(-1px) !important;
+          box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3) !important;
+        }
+        
+        .turboread-instructions {
+          text-align: center !important;
+          font-size: 12px !important;
+          color: rgba(255, 255, 255, 0.6) !important;
+          font-weight: 500 !important;
+          letter-spacing: 0.025em !important;
+        }
+        
+        .turboread-reading-progress {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          height: 3px !important;
+          background: linear-gradient(90deg, #22c55e, #16a34a) !important;
+          z-index: 2147483646 !important;
+          transition: width 0.3s ease !important;
+          box-shadow: 0 0 10px rgba(34, 197, 94, 0.5) !important;
         }
 
         .turboread-highlight {
-          background-color: rgba(255, 235, 59, 0.4) !important;
-          transition: background-color 0.3s ease !important;
+          background-color: rgba(255, 235, 59, 0.6) !important;
+          transition: background-color 0.2s ease !important;
           border-radius: 2px !important;
-        }
-
-        .turboread-current-highlight {
-          background-color: rgba(255, 193, 7, 0.6) !important;
-          border: 1px solid rgba(255, 193, 7, 0.8) !important;
+          padding: 1px 2px !important;
+          margin: -1px -2px !important;
         }
       `;
       document.head.appendChild(style);
@@ -381,36 +383,24 @@ class TurboReadSpeedReader {
     const playBtn = this.container.querySelector('#play-btn') as HTMLButtonElement;
     const resetBtn = this.container.querySelector('#reset-btn') as HTMLButtonElement;
     const closeBtn = this.container.querySelector('#close-btn') as HTMLButtonElement;
-    const voiceModeBtn = this.container.querySelector('#voice-mode-btn') as HTMLButtonElement;
-    const muteBtn = this.container.querySelector('#mute-btn') as HTMLButtonElement;
 
     const wpmSlider = this.container.querySelector('#wpm-slider') as HTMLInputElement;
-    const wpmInput = this.container.querySelector('#wpm-input') as HTMLInputElement;
     const wordsSlider = this.container.querySelector('#words-slider') as HTMLInputElement;
 
     playBtn?.addEventListener('click', () => this.togglePlayPause());
     resetBtn?.addEventListener('click', () => this.reset());
     closeBtn?.addEventListener('click', () => this.close());
-    voiceModeBtn?.addEventListener('click', () => this.toggleVoiceMode());
-    muteBtn?.addEventListener('click', () => this.toggleMute());
 
     wpmSlider?.addEventListener('input', (e) => {
       const value = parseInt((e.target as HTMLInputElement).value);
       this.settings.wpm = value;
-      if (wpmInput) wpmInput.value = value.toString();
-    });
-
-    wpmInput?.addEventListener('change', (e) => {
-      const value = Math.max(50, Math.min(1000, parseInt((e.target as HTMLInputElement).value) || 300));
-      this.settings.wpm = value;
-      if (wpmSlider) wpmSlider.value = value.toString();
-      (e.target as HTMLInputElement).value = value.toString();
+      this.updateSliderValues();
     });
 
     wordsSlider?.addEventListener('input', (e) => {
       const value = parseInt((e.target as HTMLInputElement).value);
       this.settings.wordsPerDisplay = value;
-      this.updateUI();
+      this.updateSliderValues();
     });
 
     document.addEventListener('keydown', this.handleKeyDown.bind(this));
@@ -450,16 +440,6 @@ class TurboReadSpeedReader {
       case 'Escape':
         this.close();
         break;
-      case 'v':
-      case 'V':
-        this.toggleVoiceMode();
-        break;
-      case 'm':
-      case 'M':
-        if (this.settings.voiceMode === 'voice') {
-          this.toggleMute();
-        }
-        break;
     }
   }
 
@@ -476,7 +456,7 @@ class TurboReadSpeedReader {
 
     this.progressBar = document.createElement('div');
     this.progressBar.id = 'turboread-progress';
-    this.progressBar.className = 'reading-progress';
+    this.progressBar.className = 'turboread-reading-progress';
     this.progressBar.style.width = '0%';
     document.body.appendChild(this.progressBar);
   }
@@ -488,49 +468,52 @@ class TurboReadSpeedReader {
     this.progressBar.style.width = `${progress}%`;
   }
 
+  private updateSliderValues(): void {
+    if (!this.container) return;
+
+    const wpmValue = this.container.querySelector('.turboread-slider-container .turboread-slider-value') as HTMLElement;
+    const wordsValue = this.container.querySelectorAll('.turboread-slider-container .turboread-slider-value')[1] as HTMLElement;
+
+    if (wpmValue) wpmValue.textContent = this.settings.wpm.toString();
+    if (wordsValue) wordsValue.textContent = this.settings.wordsPerDisplay.toString();
+  }
+
   private updateUI(): void {
     if (!this.container) return;
 
-    const wordText = this.container.querySelector('.word-text') as HTMLElement;
-    const wordProgress = this.container.querySelector('.word-progress') as HTMLElement;
+    const wordText = this.container.querySelector('.turboread-word-text') as HTMLElement;
+    const wordProgress = this.container.querySelector('.turboread-word-progress') as HTMLElement;
     const playBtn = this.container.querySelector('#play-btn') as HTMLButtonElement;
-    const wordsDisplay = this.container.querySelector('.value-display') as HTMLElement;
 
     if (wordText) {
       if (this.words.length === 0) {
         wordText.textContent = 'Ready to read...';
       } else {
-        const displayText = this.settings.voiceMode === 'visual' 
-          ? this.words.slice(this.currentIndex, this.currentIndex + this.settings.wordsPerDisplay).join(' ')
-          : this.voiceStatus === 'speaking' 
-            ? `Speaking: "${this.words.slice(this.currentIndex, this.currentIndex + 10).join(' ')}..."`
-            : this.voiceStatus === 'connecting'
-              ? 'Connecting to voice...'
-              : 'Ready for voice reading...';
-        
-        wordText.textContent = displayText || 'Ready to read...';
+        const displayText = this.words.slice(this.currentIndex, this.currentIndex + this.settings.wordsPerDisplay).join(' ');
+        wordText.textContent = displayText || 'Completed!';
       }
     }
 
-    if (wordProgress && this.words.length > 0) {
-      if (this.settings.voiceMode === 'visual') {
+    if (wordProgress) {
+      if (this.words.length > 0) {
         wordProgress.textContent = `${Math.min(this.currentIndex + this.settings.wordsPerDisplay, this.words.length)} of ${this.words.length} words`;
       } else {
-        wordProgress.textContent = `Voice Mode: ${this.voiceStatus}`;
+        wordProgress.textContent = '0 of 0 words';
       }
     }
 
     if (playBtn) {
-      playBtn.textContent = (this.isPlaying || this.voiceStatus === 'speaking') ? '⏸️ Pause' : '▶️ Play';
+      const playIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"></polygon></svg>`;
+      const pauseIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+      
+      playBtn.innerHTML = this.isPlaying ? `${pauseIcon} Pause` : `${playIcon} Play`;
     }
 
-    if (wordsDisplay) {
-      wordsDisplay.textContent = this.settings.wordsPerDisplay.toString();
-    }
+    this.updateSliderValues();
   }
 
-  private mapTextToNodes(text: string): void {
-    this.textNodes = [];
+  private mapWordsToDOM(text: string): void {
+    this.wordPositions = [];
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
@@ -559,21 +542,27 @@ class TurboReadSpeedReader {
       }
     );
 
-    let currentWordIndex = 0;
-    let node: Text | null;
+    let globalWordIndex = 0;
+    let textNode: Text | null;
     
-    while (node = walker.nextNode() as Text) {
-      const nodeText = node.textContent || '';
-      const words = nodeText.split(/\s+/).filter(w => w.length > 0);
+    while (textNode = walker.nextNode() as Text) {
+      const nodeText = textNode.textContent || '';
+      const words = nodeText.match(/\S+/g) || [];
       
-      if (words.length > 0) {
-        this.textNodes.push({
-          node,
-          text: nodeText,
-          wordStart: currentWordIndex,
-          wordEnd: currentWordIndex + words.length - 1
-        });
-        currentWordIndex += words.length;
+      let searchIndex = 0;
+      for (const word of words) {
+        const wordStart = nodeText.indexOf(word, searchIndex);
+        if (wordStart !== -1) {
+          this.wordPositions.push({
+            word,
+            textNode,
+            startOffset: wordStart,
+            endOffset: wordStart + word.length,
+            globalIndex: globalWordIndex
+          });
+          globalWordIndex++;
+          searchIndex = wordStart + word.length;
+        }
       }
     }
   }
@@ -581,56 +570,46 @@ class TurboReadSpeedReader {
   private highlightWords(startIndex: number, endIndex: number): void {
     this.clearHighlights();
     
-    for (const textNode of this.textNodes) {
-      if (textNode.wordEnd < startIndex || textNode.wordStart > endIndex) continue;
-      
-      const nodeWords = textNode.text.split(/\s+/).filter(w => w.length > 0);
-      const relativeStart = Math.max(0, startIndex - textNode.wordStart);
-      const relativeEnd = Math.min(nodeWords.length - 1, endIndex - textNode.wordStart);
-      
-      if (relativeStart <= relativeEnd) {
-        this.highlightNodeWords(textNode.node, nodeWords, relativeStart, relativeEnd);
+    for (let i = startIndex; i <= Math.min(endIndex, this.wordPositions.length - 1); i++) {
+      const wordPos = this.wordPositions[i];
+      if (wordPos) {
+        this.highlightSingleWord(wordPos);
       }
+    }
+    
+    // Scroll to first highlighted word
+    if (this.highlightElements.length > 0) {
+      this.scrollToHighlight(this.highlightElements[0]);
     }
   }
 
-  private highlightNodeWords(textNode: Text, words: string[], startWord: number, endWord: number): void {
-    const parent = textNode.parentElement;
-    if (!parent) return;
-
-    const originalText = textNode.textContent || '';
-    const beforeText = originalText.substring(0, originalText.indexOf(words[startWord]));
-    const highlightText = words.slice(startWord, endWord + 1).join(' ');
-    const afterText = originalText.substring(beforeText.length + highlightText.length);
-
-    const beforeNode = beforeText ? document.createTextNode(beforeText) : null;
-    const highlightSpan = document.createElement('span');
-    highlightSpan.className = 'turboread-highlight turboread-current-highlight';
-    highlightSpan.textContent = highlightText;
-    const afterNode = afterText ? document.createTextNode(afterText) : null;
-
-    if (beforeNode) parent.insertBefore(beforeNode, textNode);
-    parent.insertBefore(highlightSpan, textNode);
-    if (afterNode) parent.insertBefore(afterNode, textNode);
+  private highlightSingleWord(wordPos: WordPosition): void {
+    const range = document.createRange();
+    range.setStart(wordPos.textNode, wordPos.startOffset);
+    range.setEnd(wordPos.textNode, wordPos.endOffset);
     
-    parent.removeChild(textNode);
-    this.highlightElements.push(highlightSpan);
-    
-    // Scroll to keep highlighted text visible
-    this.scrollToHighlight(highlightSpan);
-  }
-
-  private scrollToHighlight(element: HTMLElement): void {
-    const rect = element.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const hudHeight = 400; // Approximate HUD height
-    
-    // Check if element is outside comfortable viewing area
-    if (rect.top < 100 || rect.bottom > viewportHeight - hudHeight - 100) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
+    try {
+      const span = document.createElement('span');
+      span.className = 'turboread-highlight';
+      range.surroundContents(span);
+      this.highlightElements.push(span);
+    } catch (error) {
+      // If range can't be surrounded, create a manual highlight
+      const span = document.createElement('span');
+      span.className = 'turboread-highlight';
+      span.textContent = wordPos.word;
+      
+      const beforeText = wordPos.textNode.textContent?.substring(0, wordPos.startOffset) || '';
+      const afterText = wordPos.textNode.textContent?.substring(wordPos.endOffset) || '';
+      
+      const parent = wordPos.textNode.parentNode;
+      if (parent) {
+        if (beforeText) parent.insertBefore(document.createTextNode(beforeText), wordPos.textNode);
+        parent.insertBefore(span, wordPos.textNode);
+        if (afterText) parent.insertBefore(document.createTextNode(afterText), wordPos.textNode);
+        parent.removeChild(wordPos.textNode);
+        this.highlightElements.push(span);
+      }
     }
   }
 
@@ -646,33 +625,34 @@ class TurboReadSpeedReader {
     this.highlightElements = [];
   }
 
-  private async initializeVapi(): Promise<void> {
-    console.log('Voice mode initialized (simulated)');
+  private scrollToHighlight(element: HTMLElement): void {
+    const rect = element.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const hudHeight = 400;
+    
+    if (rect.top < 100 || rect.bottom > viewportHeight - hudHeight - 100) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
   }
 
   private togglePlayPause(): void {
     if (this.words.length === 0) return;
 
-    if (this.settings.voiceMode === 'voice') {
-      if (this.voiceStatus === 'speaking') {
-        this.stopVoiceReading();
-      } else if (this.voiceStatus === 'idle') {
-        this.startVoiceReading();
-      }
+    this.isPlaying = !this.isPlaying;
+    
+    if (this.isPlaying) {
+      this.startReading();
     } else {
-      this.isPlaying = !this.isPlaying;
-      
-      if (this.isPlaying) {
-        this.startVisualReading();
-      } else {
-        this.stopVisualReading();
-      }
+      this.stopReading();
     }
     
     this.updateUI();
   }
 
-  private startVisualReading(): void {
+  private startReading(): void {
     if (this.intervalRef) return;
 
     const delay = 60000 / this.settings.wpm;
@@ -684,7 +664,7 @@ class TurboReadSpeedReader {
       this.currentIndex += this.settings.wordsPerDisplay;
       
       if (this.currentIndex >= this.words.length) {
-        this.stopVisualReading();
+        this.stopReading();
         return;
       }
       
@@ -696,55 +676,17 @@ class TurboReadSpeedReader {
     this.highlightWords(this.currentIndex, this.currentIndex + this.settings.wordsPerDisplay - 1);
   }
 
-  private stopVisualReading(): void {
+  private stopReading(): void {
     if (this.intervalRef) {
       clearInterval(this.intervalRef);
       this.intervalRef = null;
     }
     this.isPlaying = false;
     this.clearHighlights();
-  }
-
-  private startVoiceReading(): void {
-    this.voiceStatus = 'connecting';
-    this.updateUI();
-    
-    setTimeout(() => {
-      this.voiceStatus = 'speaking';
-      this.isPlaying = true;
-      this.updateUI();
-      
-      // Simulate voice reading with highlighting
-      const voiceDelay = (60000 / this.settings.wpm) * 3; // Slower for voice
-      this.intervalRef = window.setInterval(() => {
-        this.highlightWords(this.currentIndex, this.currentIndex + 2);
-        this.currentIndex += 3;
-        
-                 if (this.currentIndex >= this.words.length) {
-           this.stopVoiceReading();
-           return;
-         }
-         
-         this.updateProgress();
-         this.updateUI();
-      }, voiceDelay);
-    }, 1000);
-  }
-
-  private stopVoiceReading(): void {
-    if (this.intervalRef) {
-      clearInterval(this.intervalRef);
-      this.intervalRef = null;
-    }
-    this.voiceStatus = 'idle';
-    this.isPlaying = false;
-    this.clearHighlights();
-    this.updateUI();
   }
 
   private reset(): void {
-    this.stopVisualReading();
-    this.stopVoiceReading();
+    this.stopReading();
     this.currentIndex = 0;
     this.isPlaying = false;
     this.clearHighlights();
@@ -752,21 +694,8 @@ class TurboReadSpeedReader {
     this.updateUI();
   }
 
-  private toggleVoiceMode(): void {
-    alert('Voice mode requires Vapi API key configuration. This is a demonstration of visual mode.');
-  }
-
-  private toggleMute(): void {
-    this.isVoiceMuted = !this.isVoiceMuted;
-    const muteBtn = this.container?.querySelector('#mute-btn') as HTMLButtonElement;
-    if (muteBtn) {
-      muteBtn.textContent = this.isVoiceMuted ? '🔇 Muted' : '🔊 Live';
-    }
-  }
-
   private close(): void {
-    this.stopVisualReading();
-    this.stopVoiceReading();
+    this.stopReading();
     this.clearHighlights();
     if (this.container) {
       this.container.remove();
@@ -777,13 +706,13 @@ class TurboReadSpeedReader {
     }
     
     document.removeEventListener('keydown', this.handleKeyDown.bind(this));
-    speedReader = null; // Reset global reference
+    speedReader = null;
   }
 
   public loadText(text: string): void {
     this.words = text.split(/\s+/).filter(word => word.length > 0);
     this.currentIndex = 0;
-    this.mapTextToNodes(text);
+    this.mapWordsToDOM(text);
     this.updateUI();
   }
 }
@@ -792,7 +721,6 @@ class TurboReadSpeedReader {
 let speedReader: TurboReadSpeedReader | null = null;
 
 document.addEventListener('keydown', (e: KeyboardEvent) => {
-  // Shift+8 activates speed reader
   if (e.shiftKey && e.key === '*') {
     e.preventDefault();
     
@@ -802,8 +730,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     
     const defaultSettings: Settings = {
       wpm: 300,
-      wordsPerDisplay: 3,
-      voiceMode: 'visual'
+      wordsPerDisplay: 3
     };
     
     speedReader = new TurboReadSpeedReader(defaultSettings);
@@ -852,7 +779,6 @@ chrome.runtime.onMessage.addListener((message: MessageData, sender, sendResponse
 });
 
 function getPageText(): string {
-  // Priority-based content detection
   const contentSelectors = [
     'article',
     'main',
@@ -869,7 +795,6 @@ function getPageText(): string {
   for (const selector of contentSelectors) {
     textSource = document.querySelector(selector);
     if (textSource) {
-      // Verify it has substantial text content
       const textLength = (textSource.textContent || '').trim().length;
       if (textLength > 100) break;
     }
@@ -879,7 +804,6 @@ function getPageText(): string {
   
   const clonedSource = textSource.cloneNode(true) as HTMLElement;
   
-  // Remove non-content elements
   const unwantedSelectors = [
     'script', 'style', 'noscript',
     'nav', 'header', 'footer', 'aside',
