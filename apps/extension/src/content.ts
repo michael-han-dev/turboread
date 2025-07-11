@@ -13,8 +13,16 @@ interface MessageData {
 
 type VoiceStatus = 'idle' | 'connecting' | 'speaking' | 'error';
 
+interface TextNode {
+  node: Text;
+  text: string;
+  wordStart: number;
+  wordEnd: number;
+}
+
 class TurboReadSpeedReader {
   private words: string[] = [];
+  private textNodes: TextNode[] = [];
   private currentIndex: number = 0;
   private isPlaying: boolean = false;
   private settings: Settings;
@@ -23,6 +31,8 @@ class TurboReadSpeedReader {
   private container: HTMLElement | null = null;
   private voiceStatus: VoiceStatus = 'idle';
   private isVoiceMuted: boolean = false;
+  private highlightElements: HTMLElement[] = [];
+  private progressBar: HTMLElement | null = null;
 
   constructor(settings: Settings) {
     this.settings = settings;
@@ -30,10 +40,15 @@ class TurboReadSpeedReader {
   }
 
   private init(): void {
-    this.createContainer();
-    this.setupEventListeners();
-    if (this.settings.voiceMode === 'voice') {
-      this.initializeVapi();
+    try {
+      this.createContainer();
+      this.createProgressBar();
+      this.setupEventListeners();
+      if (this.settings.voiceMode === 'voice') {
+        this.initializeVapi();
+      }
+    } catch (error) {
+      console.error('TurboRead initialization error:', error);
     }
   }
 
@@ -121,6 +136,15 @@ class TurboReadSpeedReader {
 
   private applyStyles(): void {
     if (!this.container) return;
+
+    if (!document.getElementById('turboread-fonts')) {
+      const fontLink = document.createElement('link');
+      fontLink.id = 'turboread-fonts';
+      fontLink.rel = 'stylesheet';
+      fontLink.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Instrument+Serif:ital,wght@0,400;1,400&display=swap';
+      document.head.appendChild(fontLink);
+    }
+
     if (!document.getElementById('turboread-styles')) {
       const style = document.createElement('style');
       style.id = 'turboread-styles';
@@ -128,7 +152,7 @@ class TurboReadSpeedReader {
         #turboread-speed-reader {
           position: fixed;
           z-index: 999999;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           user-select: none;
           pointer-events: auto;
         }
@@ -154,8 +178,10 @@ class TurboReadSpeedReader {
         
         .header h3 {
           margin: 0;
+          font-family: 'Instrument Serif', serif;
           font-size: 16px;
-          font-weight: 600;
+          font-weight: 400;
+          letter-spacing: -0.48px;
         }
         
         .header-controls {
@@ -320,6 +346,28 @@ class TurboReadSpeedReader {
           color: rgba(255, 255, 255, 0.6);
           font-weight: 500;
         }
+
+        .reading-progress {
+          position: fixed;
+          top: 0;
+          left: 0;
+          height: 3px;
+          background: linear-gradient(90deg, #22c55e, #16a34a);
+          z-index: 1000000;
+          transition: width 0.3s ease;
+          box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+        }
+
+        .turboread-highlight {
+          background-color: rgba(255, 235, 59, 0.4) !important;
+          transition: background-color 0.3s ease !important;
+          border-radius: 2px !important;
+        }
+
+        .turboread-current-highlight {
+          background-color: rgba(255, 193, 7, 0.6) !important;
+          border: 1px solid rgba(255, 193, 7, 0.8) !important;
+        }
       `;
       document.head.appendChild(style);
     }
@@ -422,6 +470,24 @@ class TurboReadSpeedReader {
     }
   }
 
+  private createProgressBar(): void {
+    const existing = document.getElementById('turboread-progress');
+    if (existing) existing.remove();
+
+    this.progressBar = document.createElement('div');
+    this.progressBar.id = 'turboread-progress';
+    this.progressBar.className = 'reading-progress';
+    this.progressBar.style.width = '0%';
+    document.body.appendChild(this.progressBar);
+  }
+
+  private updateProgress(): void {
+    if (!this.progressBar || this.words.length === 0) return;
+    
+    const progress = Math.min(100, (this.currentIndex / this.words.length) * 100);
+    this.progressBar.style.width = `${progress}%`;
+  }
+
   private updateUI(): void {
     if (!this.container) return;
 
@@ -463,8 +529,124 @@ class TurboReadSpeedReader {
     }
   }
 
+  private mapTextToNodes(text: string): void {
+    this.textNodes = [];
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: (node) => {
+          const parent = node.parentElement;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          
+          const style = window.getComputedStyle(parent);
+          if (style.display === 'none' || style.visibility === 'hidden') {
+            return NodeFilter.FILTER_REJECT;
+          }
+          
+          const tagName = parent.tagName.toLowerCase();
+          if (['script', 'style', 'nav', 'header', 'footer'].includes(tagName)) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          
+          if (parent.closest('#turboread-speed-reader')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          
+          const nodeText = node.textContent?.trim();
+          return nodeText && nodeText.length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        }
+      }
+    );
+
+    let currentWordIndex = 0;
+    let node: Text | null;
+    
+    while (node = walker.nextNode() as Text) {
+      const nodeText = node.textContent || '';
+      const words = nodeText.split(/\s+/).filter(w => w.length > 0);
+      
+      if (words.length > 0) {
+        this.textNodes.push({
+          node,
+          text: nodeText,
+          wordStart: currentWordIndex,
+          wordEnd: currentWordIndex + words.length - 1
+        });
+        currentWordIndex += words.length;
+      }
+    }
+  }
+
+  private highlightWords(startIndex: number, endIndex: number): void {
+    this.clearHighlights();
+    
+    for (const textNode of this.textNodes) {
+      if (textNode.wordEnd < startIndex || textNode.wordStart > endIndex) continue;
+      
+      const nodeWords = textNode.text.split(/\s+/).filter(w => w.length > 0);
+      const relativeStart = Math.max(0, startIndex - textNode.wordStart);
+      const relativeEnd = Math.min(nodeWords.length - 1, endIndex - textNode.wordStart);
+      
+      if (relativeStart <= relativeEnd) {
+        this.highlightNodeWords(textNode.node, nodeWords, relativeStart, relativeEnd);
+      }
+    }
+  }
+
+  private highlightNodeWords(textNode: Text, words: string[], startWord: number, endWord: number): void {
+    const parent = textNode.parentElement;
+    if (!parent) return;
+
+    const originalText = textNode.textContent || '';
+    const beforeText = originalText.substring(0, originalText.indexOf(words[startWord]));
+    const highlightText = words.slice(startWord, endWord + 1).join(' ');
+    const afterText = originalText.substring(beforeText.length + highlightText.length);
+
+    const beforeNode = beforeText ? document.createTextNode(beforeText) : null;
+    const highlightSpan = document.createElement('span');
+    highlightSpan.className = 'turboread-highlight turboread-current-highlight';
+    highlightSpan.textContent = highlightText;
+    const afterNode = afterText ? document.createTextNode(afterText) : null;
+
+    if (beforeNode) parent.insertBefore(beforeNode, textNode);
+    parent.insertBefore(highlightSpan, textNode);
+    if (afterNode) parent.insertBefore(afterNode, textNode);
+    
+    parent.removeChild(textNode);
+    this.highlightElements.push(highlightSpan);
+    
+    // Scroll to keep highlighted text visible
+    this.scrollToHighlight(highlightSpan);
+  }
+
+  private scrollToHighlight(element: HTMLElement): void {
+    const rect = element.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const hudHeight = 400; // Approximate HUD height
+    
+    // Check if element is outside comfortable viewing area
+    if (rect.top < 100 || rect.bottom > viewportHeight - hudHeight - 100) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }
+
+  private clearHighlights(): void {
+    this.highlightElements.forEach(element => {
+      const parent = element.parentElement;
+      if (parent) {
+        const textNode = document.createTextNode(element.textContent || '');
+        parent.replaceChild(textNode, element);
+        parent.normalize();
+      }
+    });
+    this.highlightElements = [];
+  }
+
   private async initializeVapi(): Promise<void> {
-    //TEST AFTER, SIMULATE THIS NOW
     console.log('Voice mode initialized (simulated)');
   }
 
@@ -496,6 +678,9 @@ class TurboReadSpeedReader {
     const delay = 60000 / this.settings.wpm;
     
     this.intervalRef = window.setInterval(() => {
+      const endIndex = this.currentIndex + this.settings.wordsPerDisplay - 1;
+      this.highlightWords(this.currentIndex, endIndex);
+      
       this.currentIndex += this.settings.wordsPerDisplay;
       
       if (this.currentIndex >= this.words.length) {
@@ -503,8 +688,12 @@ class TurboReadSpeedReader {
         return;
       }
       
+      this.updateProgress();
       this.updateUI();
     }, delay);
+
+    // Highlight first words immediately
+    this.highlightWords(this.currentIndex, this.currentIndex + this.settings.wordsPerDisplay - 1);
   }
 
   private stopVisualReading(): void {
@@ -513,6 +702,7 @@ class TurboReadSpeedReader {
       this.intervalRef = null;
     }
     this.isPlaying = false;
+    this.clearHighlights();
   }
 
   private startVoiceReading(): void {
@@ -523,12 +713,32 @@ class TurboReadSpeedReader {
       this.voiceStatus = 'speaking';
       this.isPlaying = true;
       this.updateUI();
+      
+      // Simulate voice reading with highlighting
+      const voiceDelay = (60000 / this.settings.wpm) * 3; // Slower for voice
+      this.intervalRef = window.setInterval(() => {
+        this.highlightWords(this.currentIndex, this.currentIndex + 2);
+        this.currentIndex += 3;
+        
+                 if (this.currentIndex >= this.words.length) {
+           this.stopVoiceReading();
+           return;
+         }
+         
+         this.updateProgress();
+         this.updateUI();
+      }, voiceDelay);
     }, 1000);
   }
 
   private stopVoiceReading(): void {
+    if (this.intervalRef) {
+      clearInterval(this.intervalRef);
+      this.intervalRef = null;
+    }
     this.voiceStatus = 'idle';
     this.isPlaying = false;
+    this.clearHighlights();
     this.updateUI();
   }
 
@@ -537,6 +747,8 @@ class TurboReadSpeedReader {
     this.stopVoiceReading();
     this.currentIndex = 0;
     this.isPlaying = false;
+    this.clearHighlights();
+    this.updateProgress();
     this.updateUI();
   }
 
@@ -555,23 +767,54 @@ class TurboReadSpeedReader {
   private close(): void {
     this.stopVisualReading();
     this.stopVoiceReading();
+    this.clearHighlights();
     if (this.container) {
       this.container.remove();
     }
+    if (this.progressBar) {
+      this.progressBar.remove();
+      this.progressBar = null;
+    }
     
     document.removeEventListener('keydown', this.handleKeyDown.bind(this));
+    speedReader = null; // Reset global reference
   }
 
   public loadText(text: string): void {
     this.words = text.split(/\s+/).filter(word => word.length > 0);
     this.currentIndex = 0;
+    this.mapTextToNodes(text);
     this.updateUI();
   }
 }
 
-// Content script message handler
+// Global keyboard shortcut handler
 let speedReader: TurboReadSpeedReader | null = null;
 
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  // Shift+8 activates speed reader
+  if (e.shiftKey && e.key === '*') {
+    e.preventDefault();
+    
+    if (speedReader) {
+      return; 
+    }
+    
+    const defaultSettings: Settings = {
+      wpm: 300,
+      wordsPerDisplay: 3,
+      voiceMode: 'visual'
+    };
+    
+    speedReader = new TurboReadSpeedReader(defaultSettings);
+    const text = getPageText();
+    speedReader.loadText(text);
+    
+    console.log('TurboRead activated via Shift+8');
+  }
+});
+
+// Content script message handler
 chrome.runtime.onMessage.addListener((message: MessageData, sender, sendResponse) => {
   try {
     switch (message.action) {
@@ -609,18 +852,57 @@ chrome.runtime.onMessage.addListener((message: MessageData, sender, sendResponse
 });
 
 function getPageText(): string {
-  // Extract readable text from the page
-  const article = document.querySelector('article');
-  const main = document.querySelector('main');
-  const content = document.querySelector('.content, .post-content, .entry-content');
+  // Priority-based content detection
+  const contentSelectors = [
+    'article',
+    'main',
+    '[role="main"]',
+    '.post-content, .entry-content, .content',
+    '.article-body, .story-body',
+    '.markdown-body, .md-content',
+    '.post, .entry',
+    'body'
+  ];
   
-  let textSource = article || main || content || document.body;
+  let textSource: Element | null = null;
   
-  const scripts = textSource.querySelectorAll('script, style, nav, header, footer, aside');
-  scripts.forEach(el => el.remove());
+  for (const selector of contentSelectors) {
+    textSource = document.querySelector(selector);
+    if (textSource) {
+      // Verify it has substantial text content
+      const textLength = (textSource.textContent || '').trim().length;
+      if (textLength > 100) break;
+    }
+  }
   
-  const text = textSource.textContent || (textSource as HTMLElement).innerText || '';
-  return text.replace(/\s+/g, ' ').trim();
+  if (!textSource) textSource = document.body;
+  
+  const clonedSource = textSource.cloneNode(true) as HTMLElement;
+  
+  // Remove non-content elements
+  const unwantedSelectors = [
+    'script', 'style', 'noscript',
+    'nav', 'header', 'footer', 'aside',
+    '.navigation', '.menu', '.sidebar',
+    '.advertisement', '.ads', '.social-share',
+    '.comments', '.comment-section',
+    '#turboread-speed-reader',
+    '[aria-hidden="true"]'
+  ];
+  
+  unwantedSelectors.forEach(selector => {
+    const elements = clonedSource.querySelectorAll(selector);
+    elements.forEach(el => el.remove());
+  });
+  
+  const text = clonedSource.textContent || clonedSource.innerText || '';
+  const cleanedText = text
+    .replace(/\s+/g, ' ')
+    .replace(/\n\s*\n/g, ' ')
+    .trim();
+  
+  console.log(`TurboRead: Extracted ${cleanedText.split(' ').length} words from ${textSource.tagName}`);
+  return cleanedText;
 }
 
-console.log('TurboRead content script loaded'); 
+console.log('TurboRead content script loaded - Press Shift+8 to activate speed reader'); 
