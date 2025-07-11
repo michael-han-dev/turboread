@@ -1,0 +1,49 @@
+/* Content CSS for TurboRead Chrome Extension */
+/* Ensures extension UI is isolated from webpage styles */
+
+#turboread-speed-reader,
+#turboread-speed-reader * {
+  all: unset;
+  box-sizing: border-box;
+}
+
+#turboread-speed-reader {
+  position: fixed !important;
+  z-index: 2147483647 !important; /* Maximum z-index for Chrome extensions */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  user-select: none !important;
+  pointer-events: auto !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Ensure buttons and inputs work properly */
+#turboread-speed-reader button {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+#turboread-speed-reader input {
+  pointer-events: auto !important;
+}
+
+/* Prevent webpage styles from interfering */
+#turboread-speed-reader div,
+#turboread-speed-reader span,
+#turboread-speed-reader button,
+#turboread-speed-reader input,
+#turboread-speed-reader label {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: none !important;
+  color: inherit !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  text-decoration: none !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+} 
