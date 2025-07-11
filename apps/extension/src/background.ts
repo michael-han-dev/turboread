@@ -1,6 +1,3 @@
-// Background script for TurboRead Chrome Extension
-// Handles extension lifecycle, context menus, and global functionality
-
 interface Settings {
   wpm: number;
   wordsPerDisplay: number;
@@ -26,7 +23,6 @@ class BackgroundController {
   }
 
   private setupEventListeners(): void {
-    // Extension installation/update
     chrome.runtime.onInstalled.addListener((details) => {
       console.log('TurboRead extension installed/updated', details);
       
@@ -42,13 +38,11 @@ class BackgroundController {
       console.log('TurboRead extension started');
     });
 
-    // Handle messages from content scripts or popup
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       this.handleMessage(message, sender, sendResponse);
-      return true; // Keep message channel open for async responses
+      return true;
     });
 
-    // Handle browser action click (when popup is not available)
     chrome.action.onClicked.addListener((tab) => {
       this.handleBrowserActionClick(tab);
     });
@@ -56,10 +50,8 @@ class BackgroundController {
 
   private async setupContextMenus(): Promise<void> {
     try {
-      // Remove existing context menus
       await chrome.contextMenus.removeAll();
 
-      // Add context menu for selected text
       chrome.contextMenus.create({
         id: 'turboread-selected',
         title: '⚡ Read with TurboRead',
@@ -67,7 +59,6 @@ class BackgroundController {
         documentUrlPatterns: ['http://*/*', 'https://*/*']
       });
 
-      // Add context menu for entire page
       chrome.contextMenus.create({
         id: 'turboread-page',
         title: '⚡ Speed Read This Page',
@@ -75,7 +66,6 @@ class BackgroundController {
         documentUrlPatterns: ['http://*/*', 'https://*/*']
       });
 
-      // Handle context menu clicks
       chrome.contextMenus.onClicked.addListener((info, tab) => {
         this.handleContextMenuClick(info, tab);
       });
@@ -138,7 +128,7 @@ class BackgroundController {
       }
     } catch (error) {
       console.error('Error handling message:', error);
-      sendResponse({ success: false, error: error.message });
+      sendResponse({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
@@ -146,16 +136,13 @@ class BackgroundController {
     if (!tab.id) return;
 
     try {
-      // Get current settings
       const settings = await this.getSettings();
 
-      // Inject content script and activate speed reader
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ['content.js']
       });
 
-      // Send activation message
       await chrome.tabs.sendMessage(tab.id, {
         action: 'activate',
         settings: settings
@@ -172,7 +159,6 @@ class BackgroundController {
     try {
       const settings = await this.getSettings();
 
-      // Inject content script
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ['content.js']
@@ -189,7 +175,6 @@ class BackgroundController {
           break;
       }
 
-      // Send message to content script
       await chrome.tabs.sendMessage(tab.id, {
         action: action,
         settings: settings,
@@ -221,8 +206,6 @@ class BackgroundController {
   }
 }
 
-// Initialize background controller
 const backgroundController = new BackgroundController();
 
-// Export for potential future use
 export default backgroundController; 

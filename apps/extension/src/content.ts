@@ -604,7 +604,7 @@ chrome.runtime.onMessage.addListener((message: MessageData, sender, sendResponse
     }
   } catch (error) {
     console.error('TurboRead error:', error);
-    sendResponse({ success: false, error: error.message });
+    sendResponse({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
@@ -619,9 +619,8 @@ function getPageText(): string {
   const scripts = textSource.querySelectorAll('script, style, nav, header, footer, aside');
   scripts.forEach(el => el.remove());
   
-  const text = textSource.textContent || textSource.innerText || '';
+  const text = textSource.textContent || (textSource as HTMLElement).innerText || '';
   return text.replace(/\s+/g, ' ').trim();
 }
 
-// Initialize if needed
 console.log('TurboRead content script loaded'); 

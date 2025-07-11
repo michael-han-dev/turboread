@@ -1,6 +1,3 @@
-/* Content CSS for TurboRead Chrome Extension */
-/* Ensures extension UI is isolated from webpage styles */
-
 #turboread-speed-reader,
 #turboread-speed-reader * {
   all: unset;
@@ -9,7 +6,7 @@
 
 #turboread-speed-reader {
   position: fixed !important;
-  z-index: 2147483647 !important; /* Maximum z-index for Chrome extensions */
+  z-index: 2147483647 !important; 
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
   user-select: none !important;
   pointer-events: auto !important;
