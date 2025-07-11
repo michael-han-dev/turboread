@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Pause, RotateCcw, X } from 'lucide-react';
-import Vapi from '@vapi-ai/web';
 
 interface SpeedReaderHUDProps {
   fileId: string;
@@ -10,10 +9,7 @@ interface SpeedReaderHUDProps {
 }
 
 interface ParsedFileResponse {
-  file: {
-    id: string;
-    filename: string;
-  };
+  file: { id: string; filename: string };
   parsedText: string;
   wordCount: number;
   cached: boolean;
@@ -33,146 +29,95 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   const [position, setPosition] = useState({ x: 300, y: 100 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [voiceMode, setVoiceMode] = useState<VoiceMode>('visual');
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
-  const [isVoiceMuted, setIsVoiceMuted] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const vapiRef = useRef<Vapi | null>(null);
-  const isVapiInitialized = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
-
-  const handleDrag = useCallback((e: React.MouseEvent) => {
-    const offset = { x: e.clientX - position.x, y: e.clientY - position.y };
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      const x = Math.max(0, Math.min(window.innerWidth - 320, e.clientX - offset.x));
-      const y = Math.max(0, Math.min(window.innerHeight - 400, e.clientY - offset.y));
-      setPosition({ x, y });
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-    }, { once: true });
-  }, [position]);
-
-  useEffect(() => {
-    if (!VAPI_PUBLIC_KEY) {
-      setVoiceError('Vapi key not configured');
-      return;
-    }
-
-    const vapi = new Vapi(VAPI_PUBLIC_KEY);
-    vapiRef.current = vapi;
-
-    vapi.on('call-start', () => {
-      isVapiInitialized.current = true;
-      setVoiceStatus('speaking');
-      setVoiceError(null);
-    });
-
-    vapi.on('call-end', () => {
-      isVapiInitialized.current = false;
-      setVoiceStatus('idle');
-      setIsPlaying(false);
-    });
-
-    vapi.on('speech-start', () => {
-      setVoiceStatus('speaking');
-    });
-
-    vapi.on('speech-end', () => {
-      setVoiceStatus('idle');
-      setIsPlaying(false);
-    });
-
-    vapi.on('error', (error: Error) => {
-      setVoiceError(error.message);
-      setVoiceStatus('error');
-      setIsPlaying(false);
-    });
-
-    return () => {
-      if (vapiRef.current) {
-        vapiRef.current.stop();
-        vapiRef.current = null;
-      }
-    };
-  }, [VAPI_PUBLIC_KEY]);
+  const ELEVENLABS_API_KEY = process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY;
+  const ELEVENLABS_VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb';
 
   const startVoiceReading = useCallback(async () => {
-    if (!vapiRef.current || words.length === 0) {
-      setVoiceError('Voice not available');
+    if (!ELEVENLABS_API_KEY) {
+      setVoiceError('ElevenLabs API key not configured');
+      return;
+    }
+    if (words.length === 0) {
+      setVoiceError('No text loaded');
       return;
     }
 
-    const textToSpeak = words.slice(currentIndex).join(' ');
+    const text = words.slice(currentIndex).join(' ');
+    setVoiceStatus('speaking');
+    setVoiceError(null);
 
-    const speak = async () => {
-      try {
-        await vapiRef.current!.say(textToSpeak, true);
-      } catch (e) {
-        setVoiceError('Failed to speak');
+    try {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY,
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5,
+            style: 0.5,
+            use_speaker_boost: true,
+            speaking_rate: voiceRate,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`ElevenLabs API error: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setVoiceStatus('idle');
+        setIsPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+      
+      audio.onerror = () => {
         setVoiceStatus('error');
-      }
-    };
+        setVoiceError('Audio playback failed');
+        setIsPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+      };
 
-    try {
-      setVoiceError(null);
-
-      if (!isVapiInitialized.current) {
-        const onCallStart = async () => {
-          await speak();
-          vapiRef.current?.off('call-start', onCallStart);
-        };
-        vapiRef.current.on('call-start', onCallStart);
-
-        await vapiRef.current.start({
-          // @ts-expect-error Supported at runtime but missing from type definitions
-          recordingEnabled: false,
-          voice: {
-            provider: 'openai',
-            voiceId: 'alloy',
-            speed: voiceRate
-          }
-        });
-      } else {
-        await speak();
-      }
-    } catch {
-      setVoiceError('Failed to start voice');
+      await audio.play();
+    } catch (error) {
       setVoiceStatus('error');
+      setVoiceError('Failed to generate speech');
+      setIsPlaying(false);
     }
-  }, [words, currentIndex, voiceRate]);
+  }, [words, currentIndex, voiceRate, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID]);
 
-  const stopVoiceReading = useCallback(async () => {
-    if (!vapiRef.current) return;
-    try {
-      await vapiRef.current.stop();
-    } catch (error) {
-      setVoiceError('Failed to stop voice');
+  const stopVoiceReading = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
+    setVoiceStatus('idle');
   }, []);
-
-  const toggleVoiceMute = useCallback(() => {
-    if (!vapiRef.current) return;
-    try {
-      const newMutedState = !isVoiceMuted;
-      vapiRef.current.setMuted(newMutedState);
-      setIsVoiceMuted(newMutedState);
-    } catch (error) {
-      setVoiceError('Failed to toggle mute');
-    }
-  }, [isVoiceMuted]);
 
   const handlePlayPause = useCallback(async () => {
     if (voiceMode === 'voice') {
       if (voiceStatus === 'speaking') {
-        await stopVoiceReading();
+        stopVoiceReading();
         setIsPlaying(false);
       } else if (voiceStatus === 'idle') {
         await startVoiceReading();
@@ -183,34 +128,46 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     }
   }, [voiceMode, voiceStatus, isPlaying, startVoiceReading, stopVoiceReading]);
 
-  const handleReset = useCallback(async () => {
-    if (voiceMode === 'voice' && voiceStatus !== 'idle') {
-      await stopVoiceReading();
-    }
+  const handleReset = useCallback(() => {
+    if (voiceMode === 'voice') stopVoiceReading();
     setIsPlaying(false);
     setCurrentIndex(0);
     setVoiceError(null);
-  }, [voiceMode, voiceStatus, stopVoiceReading]);
+  }, [voiceMode, stopVoiceReading]);
 
-  const toggleVoiceMode = useCallback(async () => {
-    const newMode: VoiceMode = voiceMode === 'visual' ? 'voice' : 'visual';
-    
-    if (isPlaying) {
-      if (voiceMode === 'voice') {
-        await stopVoiceReading();
-      }
-      setIsPlaying(false);
-    }
-    
-    setVoiceMode(newMode);
+  const toggleVoiceMode = useCallback(() => {
+    if (isPlaying && voiceMode === 'voice') stopVoiceReading();
+    setIsPlaying(false);
+    setVoiceMode((m) => (m === 'visual' ? 'voice' : 'visual'));
     setVoiceError(null);
-  }, [voiceMode, isPlaying, stopVoiceReading]);
+  }, [isPlaying, voiceMode, stopVoiceReading]);
 
   const updateWpm = useCallback((value: number) => {
     const clamped = Math.max(50, Math.min(1000, value));
     setWpm(clamped);
     setRawWpmInput(clamped.toString());
   }, []);
+
+  const handleWordsPerDisplayChange = useCallback((value: number) => {
+    setWordsPerDisplay(Math.max(1, Math.min(10, value)));
+  }, []);
+
+  const handleDrag = useCallback(
+    (e: React.MouseEvent) => {
+      const offset = { x: e.clientX - position.x, y: e.clientY - position.y };
+      const move = (m: MouseEvent) => {
+        setPosition({
+          x: Math.max(0, Math.min(window.innerWidth - 320, m.clientX - offset.x)),
+          y: Math.max(0, Math.min(window.innerHeight - 400, m.clientY - offset.y)),
+        });
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', () => document.removeEventListener('mousemove', move), {
+        once: true,
+      });
+    },
+    [position],
+  );
 
   const handleWpmInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
@@ -221,72 +178,37 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     }
   };
 
-  const handleWordsPerDisplayChange = useCallback((value: number) => {
-    setWordsPerDisplay(Math.max(1, Math.min(10, value)));
-  }, []);
-
-  useEffect(() => {
-    const originalConsoleError = console.error;
-    console.error = (...args) => {
-      const message = args[0]?.toString() || '';
-      if (message.includes('browser is not defined') || 
-          message.includes('Cannot read properties of undefined') ||
-          message.includes('Utilities') ||
-          message.includes('Translate')) {
-        return; 
-      }
-      originalConsoleError.apply(console, args);
-    };
-    return () => {
-      console.error = originalConsoleError;
-    };
-  }, []);
-
   useEffect(() => {
     const fetchParsedText = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:3001/file/${fileId}/parsed`);
-        if (!response.ok) throw new Error('Failed to fetch parsed text');
-        
-        const data: ParsedFileResponse = await response.json();
-        const wordArray = data.parsedText.split(/\s+/).filter(word => word.length > 0);
-        setWords(wordArray);
-        setLoading(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load text');
+        const res = await fetch(`http://localhost:3001/file/${fileId}/parsed`);
+        if (!res.ok) throw new Error('fetch failed');
+        const data: ParsedFileResponse = await res.json();
+        setWords(data.parsedText.split(/\s+/).filter(Boolean));
+      } catch (e) {
+        setError('Failed to load text');
+      } finally {
         setLoading(false);
       }
     };
-
     fetchParsedText();
   }, [fileId]);
 
   useEffect(() => {
-    if (voiceMode === 'visual' && isPlaying && words.length > 0) {
-      const delay = 60000 / wpm; 
-      
+    if (voiceMode === 'visual' && isPlaying && words.length) {
+      const delay = 60000 / wpm;
       intervalRef.current = setInterval(() => {
-        setCurrentIndex(prev => {
-          if (prev + wordsPerDisplay >= words.length) {
+        setCurrentIndex((p) => {
+          if (p + wordsPerDisplay >= words.length) {
             setIsPlaying(false);
-            return prev;
+            return p;
           }
-          return prev + wordsPerDisplay;
+          return p + wordsPerDisplay;
         });
       }, delay);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
+    } else clearInterval(intervalRef.current as NodeJS.Timeout);
+    return () => clearInterval(intervalRef.current as NodeJS.Timeout);
   }, [voiceMode, isPlaying, wpm, wordsPerDisplay, words.length]);
 
   useEffect(() => {
@@ -314,7 +236,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
         case 'a':
           e.preventDefault();
           if (voiceMode === 'voice') {
-            setVoiceRate(prev => Math.max(0.5, parseFloat((prev - 0.1).toFixed(1))));
+            setVoiceRate(prev => Math.max(0.3, parseFloat((prev - 0.1).toFixed(1))));
           } else {
             updateWpm(Math.max(50, wpm - 10));
           }
@@ -322,7 +244,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
         case 'd':
           e.preventDefault();
           if (voiceMode === 'voice') {
-            setVoiceRate(prev => Math.min(2, parseFloat((prev + 0.1).toFixed(1))));
+            setVoiceRate(prev => Math.min(4, parseFloat((prev + 0.1).toFixed(1))));
           } else {
             updateWpm(Math.min(1000, wpm + 10));
           }
@@ -343,12 +265,6 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
           e.preventDefault();
           toggleVoiceMode();
           break;
-        case 'm':
-          e.preventDefault();
-          if (voiceMode === 'voice') {
-            toggleVoiceMute();
-          }
-          break;
         case 'Escape':
           onClose();
           break;
@@ -357,7 +273,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, wpm, wordsPerDisplay, voiceMode, updateWpm, handleWordsPerDisplayChange, toggleVoiceMode, toggleVoiceMute]);
+  }, [onClose, wpm, wordsPerDisplay, voiceMode, updateWpm, handleWordsPerDisplayChange, toggleVoiceMode]);
 
   useEffect(() => {
     const handleSpaceBar = (e: KeyboardEvent) => {
@@ -371,102 +287,86 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     return () => window.removeEventListener('keydown', handleSpaceBar);
   }, [handlePlayPause]);
 
-  const wordsToDisplay = voiceMode === 'visual' 
-    ? words.slice(currentIndex, currentIndex + wordsPerDisplay).join(' ')
-    : voiceStatus === 'speaking' 
+  const wordsToDisplay =
+    voiceMode === 'visual'
+      ? words.slice(currentIndex, currentIndex + wordsPerDisplay).join(' ')
+      : voiceStatus === 'speaking'
       ? `Speaking: "${words.slice(currentIndex, currentIndex + 10).join(' ')}..."`
-      : voiceStatus === 'idle'
-        ? 'Ready for voice reading...'
-        : 'Voice error';
+      : 'Ready for voice reading...';
 
-  if (loading) {
+  if (loading)
     return (
-      <div 
+      <div
         className="fixed bg-gray-900/50 backdrop-blur-sm rounded-lg p-6 text-white shadow-2xl border border-gray-600"
         style={{ left: position.x, top: position.y, width: '300px', height: '200px' }}
       >
         <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-            <p>Loading text...</p>
-          </div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
         </div>
       </div>
     );
-  }
 
-  if (error) {
+  if (error)
     return (
-      <div 
+      <div
         className="fixed bg-red-900/80 backdrop-blur-sm rounded-lg p-6 text-white shadow-2xl border border-red-600"
         style={{ left: position.x, top: position.y, width: '300px', height: '200px' }}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Error</h3>
-          <button onClick={onClose} className="text-white hover:text-gray-300">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
         <p className="text-red-200">{error}</p>
       </div>
     );
-  }
 
   return (
-    <div 
+    <div
       className="fixed bg-gray-900/50 rounded-lg p-4 text-white shadow-2xl border border-gray-600 select-none cursor-move"
       style={{ left: position.x, top: position.y, width: '320px', height: '420px' }}
       tabIndex={0}
       onMouseDown={(e) => {
         if (
-          e.target instanceof Element && 
-          (e.target.closest('button') || 
-           e.target.closest('input') || 
-           e.target.closest('select') || 
-           e.target.closest('label'))
-        ) return;
+          e.target instanceof Element &&
+          (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('label'))
+        )
+          return;
         handleDrag(e);
       }}
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold">Speed Reader</h3>
         <div className="flex items-center gap-2">
-          {VAPI_PUBLIC_KEY && (
-            <button
-              onClick={toggleVoiceMode}
-              className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
-                voiceMode === 'voice' 
-                  ? 'bg-purple-600 hover:bg-purple-700' 
-                  : 'bg-gray-600 hover:bg-gray-700'
-              }`}
-              title="Toggle Voice Mode (V)"
-            >
-              {voiceMode === 'voice' ? 'Voice' : 'Visual'}
-            </button>
-          )}
-          <button 
-            onClick={onClose}
-            className="text-white hover:text-gray-300 transition-colors"
+          <button
+            onClick={toggleVoiceMode}
+            className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+              voiceMode === 'voice' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-600 hover:bg-gray-700'
+            }`}
+            title="Toggle Voice Mode (V)"
           >
+            {voiceMode === 'voice' ? 'Voice' : 'Visual'}
+          </button>
+          <button onClick={onClose} className="hover:text-gray-300">
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      <div className={`rounded-lg p-6 mb-4 h-[120px] flex items-center justify-center overflow-hidden ${
-        voiceMode === 'voice' ? 'bg-purple-900/25' : 'bg-black/25'
-      }`}>
+      <div
+        className={`rounded-lg p-6 mb-4 h-[120px] flex items-center justify-center ${
+          voiceMode === 'voice' ? 'bg-purple-900/25' : 'bg-black/25'
+        }`}
+      >
         <div className="text-center w-full">
-          <div className={`text-xl font-mono mb-2 break-words overflow-hidden text-ellipsis font-bold ${
-            voiceMode === 'voice' ? 'text-purple-400' : 'text-green-400'
-          }`} style={{
-            fontSize: wordsPerDisplay > 3 ? '1rem' : '1.25rem',
-            lineHeight: '1.4',
-            maxHeight: '4.2em',
-            display: '-webkit-box',
-            WebkitLineClamp: '3',
-            WebkitBoxOrient: 'vertical'
-          }}>
+          <div
+            className={`text-xl font-mono mb-2 font-bold ${
+              voiceMode === 'voice' ? 'text-purple-400' : 'text-green-400'
+            }`}
+            style={{
+              fontSize: wordsPerDisplay > 3 ? '1rem' : '1.25rem',
+              lineHeight: '1.4',
+              maxHeight: '4.2em',
+              display: '-webkit-box',
+              WebkitLineClamp: '3',
+              WebkitBoxOrient: 'vertical',
+            }}
+          >
             {wordsToDisplay || 'Ready to read...'}
           </div>
           <div className="text-sm text-gray-400 font-bold">
@@ -482,17 +382,17 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
         </div>
       )}
 
-      <div className="space-y-3 flex flex-col h-[calc(100%-200px)]">
+      <div className="space-y-2.5 flex flex-col">
         <div>
-          <label className="block text-sm text-gray-300 mb-1 font-bold">
-            {voiceMode === 'voice' ? 'Voice Rate (0.5x – 2x, A/D)' : 'Words Per Minute (A/D)'}
+          <label className="block text-sm mb-1 font-bold text-gray-300">
+            {voiceMode === 'voice' ? 'Voice Rate (0.3x – 4x, A/D)' : 'Words Per Minute (A/D)'}
           </label>
           <div className="flex items-center gap-2">
             {voiceMode === 'voice' ? (
               <input
                 type="range"
-                min="0.5"
-                max="2"
+                min="0.3"
+                max="4"
                 step="0.1"
                 value={voiceRate}
                 onChange={(e) => setVoiceRate(parseFloat(e.target.value))}
@@ -542,7 +442,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
 
         {voiceMode === 'visual' && (
           <div>
-            <label className="block text-sm text-gray-300 mb-1 font-bold">Words Per Display (H/K)</label>
+            <label className="block text-sm mb-1 font-bold text-gray-300">Words Per Display (H/K)</label>
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -561,16 +461,13 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
           <button
             onClick={handlePlayPause}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              voiceMode === 'voice' 
-                ? 'bg-purple-600 hover:bg-purple-700' 
-                : 'bg-green-600 hover:bg-green-700'
+              voiceMode === 'voice' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'
             }`}
-            disabled={words.length === 0 || (voiceMode === 'voice' && !VAPI_PUBLIC_KEY)}
+            disabled={words.length === 0}
           >
             {(isPlaying || voiceStatus === 'speaking') ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             {(isPlaying || voiceStatus === 'speaking') ? 'Pause' : 'Play'}
           </button>
-          
           <button
             onClick={handleReset}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
@@ -583,8 +480,8 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
 
         <div className="text-sm text-white/70 text-center mt-auto pb-2 font-bold">
           {voiceMode === 'voice' 
-            ? 'V: toggle mode • M: mute • ESC: close'
-            : 'V: voice mode • mouse/arrows: move • ESC: close'
+            ? 'V: toggle mode • Space: play/pause • ESC: close'
+            : 'V: voice mode • Space: play/pause • mouse/arrows: move • ESC: close'
           }
         </div>
       </div>
