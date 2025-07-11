@@ -54,14 +54,14 @@ class BackgroundController {
 
       chrome.contextMenus.create({
         id: 'turboread-selected',
-        title: '⚡ Read with TurboRead',
+        title: 'Read with TurboRead',
         contexts: ['selection'],
         documentUrlPatterns: ['http://*/*', 'https://*/*']
       });
 
       chrome.contextMenus.create({
         id: 'turboread-page',
-        title: '⚡ Speed Read This Page',
+        title: 'Speed Read This Page',
         contexts: ['page'],
         documentUrlPatterns: ['http://*/*', 'https://*/*']
       });
