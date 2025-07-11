@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Pause, RotateCcw, X, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, RotateCcw, X } from 'lucide-react';
 import Vapi from '@vapi-ai/web';
 
 interface SpeedReaderHUDProps {
@@ -28,6 +28,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   const [isPlaying, setIsPlaying] = useState(false);
   const [wpm, setWpm] = useState(300);
   const [rawWpmInput, setRawWpmInput] = useState('300');
+  const [voiceRate, setVoiceRate] = useState(1);
   const [wordsPerDisplay, setWordsPerDisplay] = useState(1);
   const [position, setPosition] = useState({ x: 300, y: 100 });
   const [loading, setLoading] = useState(true);
@@ -109,31 +110,44 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       return;
     }
 
+    const textToSpeak = words.slice(currentIndex).join(' ');
+
+    const speak = async () => {
+      try {
+        await vapiRef.current!.say(textToSpeak, true);
+      } catch (e) {
+        setVoiceError('Failed to speak');
+        setVoiceStatus('error');
+      }
+    };
+
     try {
       setVoiceError(null);
-      const textToSpeak = words.slice(currentIndex).join(' ');
 
       if (!isVapiInitialized.current) {
+        const onCallStart = async () => {
+          await speak();
+          vapiRef.current?.off('call-start', onCallStart);
+        };
+        vapiRef.current.on('call-start', onCallStart);
+
         await vapiRef.current.start({
-          model: {
-            provider: "openai",
-            model: "gpt-4o-mini",
-            messages: [{ role: "system", content: "You only speak when told to say something." }]
-          },
+          // @ts-expect-error Supported at runtime but missing from type definitions
+          recordingEnabled: false,
           voice: {
-            provider: "openai",
-            voiceId: "alloy"
+            provider: 'openai',
+            voiceId: 'alloy',
+            speed: voiceRate
           }
         });
+      } else {
+        await speak();
       }
-
-      await vapiRef.current.say(textToSpeak, true);
-      
-    } catch (error) {
+    } catch {
       setVoiceError('Failed to start voice');
       setVoiceStatus('error');
     }
-  }, [words, currentIndex]);
+  }, [words, currentIndex, voiceRate]);
 
   const stopVoiceReading = useCallback(async () => {
     if (!vapiRef.current) return;
@@ -299,11 +313,19 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
           break;
         case 'a':
           e.preventDefault();
-          updateWpm(Math.max(50, wpm - 10));
+          if (voiceMode === 'voice') {
+            setVoiceRate(prev => Math.max(0.5, parseFloat((prev - 0.1).toFixed(1))));
+          } else {
+            updateWpm(Math.max(50, wpm - 10));
+          }
           break;
         case 'd':
           e.preventDefault();
-          updateWpm(Math.min(1000, wpm + 10));
+          if (voiceMode === 'voice') {
+            setVoiceRate(prev => Math.min(2, parseFloat((prev + 0.1).toFixed(1))));
+          } else {
+            updateWpm(Math.min(1000, wpm + 10));
+          }
           break;
         case 'h':
           e.preventDefault();
@@ -463,42 +485,58 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       <div className="space-y-3 flex flex-col h-[calc(100%-200px)]">
         <div>
           <label className="block text-sm text-gray-300 mb-1 font-bold">
-            {voiceMode === 'voice' ? 'Voice Speed (A/D)' : 'Words Per Minute (A/D)'}
+            {voiceMode === 'voice' ? 'Voice Rate (0.5x – 2x, A/D)' : 'Words Per Minute (A/D)'}
           </label>
           <div className="flex items-center gap-2">
-            <input
-              type="range"
-              min="50"
-              max="1000"
-              value={wpm}
-              onChange={(e) => updateWpm(Number(e.target.value))}
-              className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-            />
-            <input
-              type="number"
-              value={rawWpmInput}
-              onChange={handleWpmInputChange}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+            {voiceMode === 'voice' ? (
+              <input
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value={voiceRate}
+                onChange={(e) => setVoiceRate(parseFloat(e.target.value))}
+                className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+              />
+            ) : (
+              <input
+                type="range"
+                min="50"
+                max="1000"
+                value={wpm}
+                onChange={(e) => updateWpm(Number(e.target.value))}
+                className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+              />
+            )}
+            {voiceMode === 'voice' ? (
+              <span className="w-16 text-center text-sm">{voiceRate.toFixed(1)}x</span>
+            ) : (
+              <input
+                type="number"
+                value={rawWpmInput}
+                onChange={handleWpmInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const num = Number(rawWpmInput);
+                    if (!isNaN(num)) {
+                      updateWpm(num);
+                    } else {
+                      setRawWpmInput(wpm.toString());
+                    }
+                    e.currentTarget.blur();
+                  }
+                }}
+                onBlur={() => {
                   const num = Number(rawWpmInput);
                   if (!isNaN(num)) {
                     updateWpm(num);
                   } else {
                     setRawWpmInput(wpm.toString());
                   }
-                  e.currentTarget.blur();
-                }
-              }}
-              onBlur={() => {
-                const num = Number(rawWpmInput);
-                if (!isNaN(num)) {
-                  updateWpm(num);
-                } else {
-                  setRawWpmInput(wpm.toString());
-                }
-              }}
-              className="w-16 px-2 py-1 bg-gray-700 rounded text-white text-sm text-center"
-            />
+                }}
+                className="w-16 px-2 py-1 bg-gray-700 rounded text-white text-sm text-center"
+              />
+            )}
           </div>
         </div>
 
