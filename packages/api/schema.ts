@@ -18,6 +18,17 @@ export const parsedFiles = pgTable('parsed_files', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export const audioChunks = pgTable('audio_chunks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  fileId: uuid('file_id').notNull().references(() => files.id, { onDelete: 'cascade' }),
+  chunkIndex: integer('chunk_index').notNull(),
+  startWordIndex: integer('start_word_index').notNull(),
+  endWordIndex: integer('end_word_index').notNull(),
+  audioKey: text('audio_key').notNull(),
+  voiceId: text('voice_id').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 // NextAuth.js Tables
 export const users = pgTable("user", {
   id: text("id").notNull().primaryKey(),

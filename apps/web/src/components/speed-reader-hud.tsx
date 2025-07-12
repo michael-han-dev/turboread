@@ -16,7 +16,7 @@ interface ParsedFileResponse {
 }
 
 type VoiceMode = 'visual' | 'voice';
-type VoiceStatus = 'idle' | 'speaking' | 'error';
+type VoiceStatus = 'idle' | 'speaking' | 'paused' | 'error';
 
 export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps) {
   const [words, setWords] = useState<string[]>([]);
@@ -198,7 +198,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       audioRef.current.pause();
       audioRef.current.ontimeupdate = null;
     }
-    setVoiceStatus('idle');
+    setVoiceStatus('paused');
   }, []);
 
   const handlePlayPause = useCallback(async () => {
@@ -206,6 +206,15 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       if (voiceStatus === 'speaking') {
         stopVoiceReading();
         setIsPlaying(false);
+      } else if (voiceStatus === 'paused') {
+        if (audioRef.current) {
+          audioRef.current.play();
+          audioRef.current.ontimeupdate = () => updateWordPosition();
+          setVoiceStatus('speaking');
+        } else {
+          await startVoiceReading();
+        }
+        setIsPlaying(true);
       } else if (voiceStatus === 'idle') {
         await startVoiceReading();
         setIsPlaying(true);
@@ -213,7 +222,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     } else {
       setIsPlaying(!isPlaying);
     }
-  }, [voiceMode, voiceStatus, isPlaying, startVoiceReading, stopVoiceReading]);
+  }, [voiceMode, voiceStatus, isPlaying, startVoiceReading, stopVoiceReading, updateWordPosition]);
 
   const handleReset = useCallback(() => {
     if (voiceMode === 'voice') stopVoiceReading();

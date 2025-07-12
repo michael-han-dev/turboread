@@ -4,8 +4,8 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, PutB
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { eq } from 'drizzle-orm';
-import { files, users, parsedFiles } from './schema';
+import { eq, and } from 'drizzle-orm';
+import { files, users, parsedFiles, audioChunks } from './schema';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 // Import pdf-parse with debug mode workaround
 const pdf = (() => {
@@ -147,6 +147,40 @@ const parseFileContent = async (buffer: Buffer, filename: string): Promise<strin
 
 const countWords = (text: string): number => {
   return text.split(/\s+/).filter(word => word.length > 0).length;
+};
+
+const generateAudioChunk = async (text: string, voiceId: string): Promise<Buffer> => {
+  const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+  if (!ELEVENLABS_API_KEY) {
+    throw new Error('ElevenLabs API key not configured');
+  }
+
+  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'audio/mpeg',
+      'Content-Type': 'application/json',
+      'xi-api-key': ELEVENLABS_API_KEY,
+    },
+    body: JSON.stringify({
+      text,
+      model_id: 'eleven_multilingual_v2',
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.5,
+        style: 0.0,
+        use_speaker_boost: true
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ElevenLabs API error ${response.status}: ${errorText}`);
+  }
+
+  const audioBuffer = await response.arrayBuffer();
+  return Buffer.from(audioBuffer);
 };
 
 const app = new Elysia()
@@ -377,6 +411,131 @@ const app = new Elysia()
   }
 
   return { file: file[0] };
+})
+
+.get('/file/:id/audio/:chunkIndex', async ({ params }) => {
+  const chunk = await db
+    .select()
+    .from(audioChunks)
+    .where(and(
+      eq(audioChunks.fileId, params.id),
+      eq(audioChunks.chunkIndex, parseInt(params.chunkIndex))
+    ));
+
+  if (!chunk[0]) {
+    throw new Error('Audio chunk not found');
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: chunk[0].audioKey
+  });
+  
+  const response = await s3.send(command);
+  const stream = response.Body as any;
+  
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  
+  return new Response(Buffer.concat(chunks), {
+    headers: {
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': Buffer.concat(chunks).length.toString()
+    }
+  });
+}, {
+  params: t.Object({
+    id: t.String(),
+    chunkIndex: t.String()
+  })
+})
+
+.post('/file/:id/audio/generate', async ({ params, body }) => {
+  const file = await db
+    .select()
+    .from(files)
+    .where(eq(files.id, params.id));
+
+  if (!file[0]) {
+    throw new Error('File not found');
+  }
+
+  const parsedFile = await db
+    .select()
+    .from(parsedFiles)
+    .where(eq(parsedFiles.fileId, file[0].id));
+
+  if (!parsedFile[0]) {
+    throw new Error('Parsed file not found');
+  }
+
+  const words = parsedFile[0].parsedText.split(/\s+/).filter(Boolean);
+  const startIndex = body.startWordIndex;
+  const endIndex = Math.min(startIndex + 200, words.length);
+  const chunkText = words.slice(startIndex, endIndex).join(' ');
+
+  if (!chunkText.trim()) {
+    throw new Error('No text to generate audio for');
+  }
+
+  const existingChunk = await db
+    .select()
+    .from(audioChunks)
+    .where(and(
+      eq(audioChunks.fileId, file[0].id),
+      eq(audioChunks.chunkIndex, body.chunkIndex),
+      eq(audioChunks.voiceId, body.voiceId)
+    ));
+
+  if (existingChunk[0]) {
+    return { 
+      chunkIndex: body.chunkIndex,
+      startWordIndex: startIndex,
+      endWordIndex: endIndex,
+      cached: true
+    };
+  }
+
+  const audioBuffer = await generateAudioChunk(chunkText, body.voiceId);
+  
+  const audioKey = `${file[0].userId}/audio/${file[0].id}_chunk_${body.chunkIndex}_${body.voiceId}.mp3`;
+  
+  const uploadCommand = new PutObjectCommand({
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: audioKey,
+    Body: audioBuffer,
+    ContentType: 'audio/mpeg'
+  });
+  
+  await s3.send(uploadCommand);
+
+  await db.insert(audioChunks).values({
+    fileId: file[0].id,
+    chunkIndex: body.chunkIndex,
+    startWordIndex: startIndex,
+    endWordIndex: endIndex,
+    audioKey,
+    voiceId: body.voiceId,
+    createdAt: new Date()
+  });
+
+  return {
+    chunkIndex: body.chunkIndex,
+    startWordIndex: startIndex,
+    endWordIndex: endIndex,
+    cached: false
+  };
+}, {
+  params: t.Object({
+    id: t.String()
+  }),
+  body: t.Object({
+    chunkIndex: t.Number(),
+    startWordIndex: t.Number(),
+    voiceId: t.String()
+  })
 })
 
 // Delete a file from S3 and DB
