@@ -26,6 +26,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   const [rawWpmInput, setRawWpmInput] = useState('300');
   const [voiceRate, setVoiceRate] = useState(1);
   const [wordsPerDisplay, setWordsPerDisplay] = useState(1);
+  const [wordPositionInput, setWordPositionInput] = useState('1');
   const [position, setPosition] = useState({ x: 300, y: 100 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,26 +35,91 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
   const [voiceError, setVoiceError] = useState<string | null>(null);
 
+  // refs for managing audio state and playback position
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const currentChunkRef = useRef<number>(0);
+  const nextChunkRef = useRef<HTMLAudioElement | null>(null);
+  const audioPositionRef = useRef<number>(0);
+  const chunkWordCountRef = useRef<number>(200);
 
-  const ELEVENLABS_API_KEY = process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY;
   const ELEVENLABS_VOICE_ID = 'fATgBRI8wg5KkDFg8vBd';
 
-  const startVoiceReading = useCallback(async () => {
-    if (!ELEVENLABS_API_KEY) {
-      setVoiceError('ElevenLabs API key not configured');
-      return;
-    }
-    if (words.length === 0) {
-      setVoiceError('No text loaded');
-      return;
+  const generateAudioChunk = useCallback(async (chunkIndex: number, startWordIndex: number): Promise<string> => {
+    const response = await fetch(`http://localhost:3001/file/${fileId}/audio/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chunkIndex,
+        startWordIndex,
+        voiceId: ELEVENLABS_VOICE_ID,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Audio generation failed:', response.status, errorText);
+      throw new Error(`Failed to generate audio chunk: ${response.status} ${errorText}`);
     }
 
-    // Get text chunk - limit to reasonable size for TTS
-    const textChunk = words.slice(currentIndex, currentIndex + 100).join(' ');
-    if (!textChunk.trim()) {
-      setVoiceError('No text to read');
+    return `http://localhost:3001/file/${fileId}/audio/${chunkIndex}`;
+  }, [fileId, ELEVENLABS_VOICE_ID]);
+
+  const loadAudioChunk = useCallback(async (chunkIndex: number, startWordIndex: number): Promise<HTMLAudioElement> => {
+    const audioUrl = await generateAudioChunk(chunkIndex, startWordIndex);
+    const audio = new Audio(audioUrl);
+    audio.playbackRate = voiceRate;
+    
+    return new Promise((resolve, reject) => {
+      audio.oncanplaythrough = () => resolve(audio);
+      audio.onerror = () => reject(new Error('Failed to load audio'));
+    });
+  }, [generateAudioChunk, voiceRate]);
+
+  // syncs visual word display with audio playback progress
+  const updateWordPosition = useCallback(() => {
+    if (!audioRef.current) return;
+    
+    const currentTime = audioRef.current.currentTime;
+    const duration = audioRef.current.duration;
+    
+    if (duration > 0) {
+      const progress = currentTime / duration;
+      const wordsInChunk = Math.min(chunkWordCountRef.current, words.length - currentChunkRef.current * 200);
+      const wordProgressInChunk = Math.floor(progress * wordsInChunk);
+      const newIndex = currentChunkRef.current * 200 + wordProgressInChunk;
+      
+      if (newIndex < words.length) {
+        setCurrentIndex(newIndex);
+      }
+    }
+  }, [words.length]);
+
+  // preloads first two 200-word chunks for playback
+  const preloadInitialChunks = useCallback(async () => {
+    if (words.length === 0) return;
+    
+    try {
+      const firstChunk = await loadAudioChunk(0, 0);
+      audioRef.current = firstChunk;
+      chunkWordCountRef.current = Math.min(200, words.length);
+      
+      if (words.length > 200) {
+        const secondChunk = await loadAudioChunk(1, 200);
+        nextChunkRef.current = secondChunk;
+      }
+    } catch (error) {
+      console.error('Preload error:', error);
+      setVoiceError(`Failed to preload audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [words.length, loadAudioChunk]);
+
+  // starts or resumes audio playback from current position
+  const startVoiceReading = useCallback(async () => {
+    if (words.length === 0) {
+      setVoiceError('No text loaded');
       return;
     }
 
@@ -61,67 +127,76 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     setVoiceError(null);
 
     try {
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': ELEVENLABS_API_KEY,
-        },
-        body: JSON.stringify({
-          text: textChunk,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.5,
-            style: 0.0,
-            use_speaker_boost: true
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error ${response.status}: ${errorText}`);
+      const chunkIndex = Math.floor(currentIndex / 200);
+      const startWordIndex = chunkIndex * 200;
+      
+      if (!audioRef.current || currentChunkRef.current !== chunkIndex) {
+        const audio = await loadAudioChunk(chunkIndex, startWordIndex);
+        audioRef.current = audio;
+        currentChunkRef.current = chunkIndex;
+        audioPositionRef.current = 0;
+        chunkWordCountRef.current = Math.min(200, words.length - startWordIndex);
       }
 
-      const audioBlob = await response.blob();
-      
-      if (audioBlob.size === 0) {
-        throw new Error('Empty audio response');
-      }
-
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      
-      audioRef.current = audio;
+      const audio = audioRef.current;
+      audio.playbackRate = voiceRate;
+      audio.currentTime = audioPositionRef.current;
       
       audio.onended = () => {
-        setVoiceStatus('idle');
-        setIsPlaying(false);
-        URL.revokeObjectURL(audioUrl);
+        const nextChunkIndex = chunkIndex + 1;
+        const nextStartWordIndex = nextChunkIndex * 200;
+        
+        if (nextStartWordIndex < words.length) {
+          if (nextChunkRef.current) {
+            audioRef.current = nextChunkRef.current;
+            currentChunkRef.current = nextChunkIndex;
+            audioPositionRef.current = 0;
+            chunkWordCountRef.current = Math.min(200, words.length - nextStartWordIndex);
+            
+            audioRef.current.playbackRate = voiceRate;
+            audioRef.current.play();
+            audioRef.current.ontimeupdate = () => {
+              updateWordPosition();
+            };
+
+            loadAudioChunk(nextChunkIndex + 1, (nextChunkIndex + 1) * 200)
+              .then(nextAudio => {
+                nextChunkRef.current = nextAudio;
+              })
+              .catch(() => {});
+          } else {
+            setVoiceStatus('idle');
+            setIsPlaying(false);
+          }
+        } else {
+          setVoiceStatus('idle');
+          setIsPlaying(false);
+        }
       };
       
       audio.onerror = () => {
         setVoiceStatus('error');
         setVoiceError('Audio playback failed');
         setIsPlaying(false);
-        URL.revokeObjectURL(audioUrl);
       };
 
-      audio.playbackRate = voiceRate;
+      audio.ontimeupdate = () => {
+        updateWordPosition();
+      };
+
       await audio.play();
     } catch (error) {
       setVoiceStatus('error');
       setVoiceError(error instanceof Error ? error.message : 'Failed to generate speech');
       setIsPlaying(false);
     }
-  }, [words, currentIndex, voiceRate, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID]);
+  }, [words, currentIndex, voiceRate, loadAudioChunk, updateWordPosition]);
 
   const stopVoiceReading = useCallback(() => {
     if (audioRef.current) {
+      audioPositionRef.current = audioRef.current.currentTime;
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      audioRef.current.ontimeupdate = null;
     }
     setVoiceStatus('idle');
   }, []);
@@ -144,8 +219,32 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     if (voiceMode === 'voice') stopVoiceReading();
     setIsPlaying(false);
     setCurrentIndex(0);
+    setWordPositionInput('1');
     setVoiceError(null);
+    audioPositionRef.current = 0;
+    currentChunkRef.current = 0;
   }, [voiceMode, stopVoiceReading]);
+
+  // handles manual word position changes and updates audio position
+  const handleWordPositionChange = useCallback((value: string) => {
+    setWordPositionInput(value);
+    const numValue = Number(value);
+    if (!isNaN(numValue) && numValue >= 1 && numValue <= words.length) {
+      const newIndex = numValue - 1;
+      setCurrentIndex(newIndex);
+      
+      if (voiceMode === 'voice') {
+        const newChunkIndex = Math.floor(newIndex / 200);
+        if (newChunkIndex !== currentChunkRef.current) {
+          audioPositionRef.current = 0;
+        } else {
+          const wordsIntoChunk = newIndex - (newChunkIndex * 200);
+          const wordsInChunk = Math.min(200, words.length - newChunkIndex * 200);
+          audioPositionRef.current = audioRef.current ? (audioRef.current.duration * wordsIntoChunk / wordsInChunk) || 0 : 0;
+        }
+      }
+    }
+  }, [words.length, voiceMode]);
 
   const toggleVoiceMode = useCallback(() => {
     if (isPlaying && voiceMode === 'voice') stopVoiceReading();
@@ -190,6 +289,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     }
   };
 
+  // loads text content and initializes audio chunks on mount
   useEffect(() => {
     const fetchParsedText = async () => {
       try {
@@ -197,7 +297,12 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
         const res = await fetch(`http://localhost:3001/file/${fileId}/parsed`);
         if (!res.ok) throw new Error('fetch failed');
         const data: ParsedFileResponse = await res.json();
-        setWords(data.parsedText.split(/\s+/).filter(Boolean));
+        const wordArray = data.parsedText.split(/\s+/).filter(Boolean);
+        setWords(wordArray);
+        
+        if (wordArray.length > 0) {
+          preloadInitialChunks();
+        }
       } catch (e) {
         setError('Failed to load text');
       } finally {
@@ -205,8 +310,9 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       }
     };
     fetchParsedText();
-  }, [fileId]);
+  }, [fileId, preloadInitialChunks]);
 
+  // handles visual mode word advancement based on wpm
   useEffect(() => {
     if (voiceMode === 'visual' && isPlaying && words.length) {
       const delay = 60000 / wpm;
@@ -223,6 +329,11 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     return () => clearInterval(intervalRef.current as NodeJS.Timeout);
   }, [voiceMode, isPlaying, wpm, wordsPerDisplay, words.length]);
 
+  useEffect(() => {
+    setWordPositionInput((currentIndex + 1).toString());
+  }, [currentIndex]);
+
+  // keyboard shortcuts for controlling playback and navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT') return;
@@ -299,21 +410,30 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     return () => window.removeEventListener('keydown', handleSpaceBar);
   }, [handlePlayPause]);
 
-  // Cleanup audio on unmount
+  // cleanup audio resources and animation frames on unmount
   useEffect(() => {
     return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
+        audioRef.current.ontimeupdate = null;
+      }
+      if (nextChunkRef.current) {
+        nextChunkRef.current.pause();
+        nextChunkRef.current.src = '';
       }
     };
   }, []);
 
+  // determines text display based on current mode and state
   const wordsToDisplay =
     voiceMode === 'visual'
       ? words.slice(currentIndex, currentIndex + wordsPerDisplay).join(' ')
       : voiceStatus === 'speaking'
-      ? `Speaking: "${words.slice(currentIndex, currentIndex + 10).join(' ')}..."`
+      ? words.slice(currentIndex, currentIndex + 3).join(' ')
       : voiceStatus === 'error'
       ? 'Voice error occurred'
       : 'Ready for voice reading...';
@@ -373,28 +493,48 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       </div>
 
       <div
-        className={`rounded-lg p-6 mb-4 h-[120px] flex items-center justify-center ${
+        className={`rounded-lg p-4 mb-4 h-[120px] flex items-center justify-center ${
           voiceMode === 'voice' ? 'bg-purple-900/25' : 'bg-black/25'
         }`}
       >
         <div className="text-center w-full">
           <div
-            className={`text-xl font-mono mb-2 font-bold ${
+            className={`font-mono mb-2 font-bold ${
               voiceMode === 'voice' ? 'text-purple-400' : 'text-green-400'
             }`}
             style={{
-              fontSize: wordsPerDisplay > 3 ? '1rem' : '1.25rem',
-              lineHeight: '1.4',
-              maxHeight: '4.2em',
+              fontSize: voiceMode === 'voice' ? '1.1rem' : wordsPerDisplay > 3 ? '1rem' : '1.25rem',
+              lineHeight: '1.3',
+              maxHeight: '4.5em',
+              overflow: 'hidden',
               display: '-webkit-box',
               WebkitLineClamp: '3',
               WebkitBoxOrient: 'vertical',
+              wordBreak: 'break-word',
             }}
           >
             {wordsToDisplay || 'Ready to read...'}
           </div>
-          <div className="text-sm text-gray-400 font-bold">
-            {words.length > 0 && voiceMode === 'visual' && `${Math.min(currentIndex + wordsPerDisplay, words.length)} of ${words.length} words`}
+          <div className="text-sm text-gray-400 font-bold flex items-center justify-center gap-2">
+            {words.length > 0 && voiceMode === 'visual' && (
+              <>
+                <input
+                  type="number"
+                  value={wordPositionInput}
+                  onChange={(e) => handleWordPositionChange(e.target.value)}
+                  onBlur={() => {
+                    const num = Number(wordPositionInput);
+                    if (isNaN(num) || num < 1 || num > words.length) {
+                      setWordPositionInput((currentIndex + 1).toString());
+                    }
+                  }}
+                  className="w-16 px-2 py-1 bg-gray-700 rounded text-white text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min="1"
+                  max={words.length}
+                />
+                <span>of {words.length} words</span>
+              </>
+            )}
             {words.length > 0 && voiceMode === 'voice' && `Voice Mode: ${voiceStatus}`}
           </div>
         </div>
@@ -458,7 +598,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
                     setRawWpmInput(wpm.toString());
                   }
                 }}
-                className="w-16 px-2 py-1 bg-gray-700 rounded text-white text-sm text-center"
+                className="w-16 px-2 py-1 bg-gray-700 rounded text-white text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             )}
           </div>
