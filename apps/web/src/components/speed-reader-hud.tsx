@@ -38,7 +38,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const ELEVENLABS_API_KEY = process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY;
-  const ELEVENLABS_VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb';
+  const ELEVENLABS_VOICE_ID = 'fATgBRI8wg5KkDFg8vBd';
 
   const startVoiceReading = useCallback(async () => {
     if (!ELEVENLABS_API_KEY) {
@@ -50,7 +50,13 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       return;
     }
 
-    const text = words.slice(currentIndex).join(' ');
+    // Get text chunk - limit to reasonable size for TTS
+    const textChunk = words.slice(currentIndex, currentIndex + 100).join(' ');
+    if (!textChunk.trim()) {
+      setVoiceError('No text to read');
+      return;
+    }
+
     setVoiceStatus('speaking');
     setVoiceError(null);
 
@@ -63,23 +69,28 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
           'xi-api-key': ELEVENLABS_API_KEY,
         },
         body: JSON.stringify({
-          text,
+          text: textChunk,
           model_id: 'eleven_multilingual_v2',
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.5,
-            style: 0.5,
-            use_speaker_boost: true,
-            speaking_rate: voiceRate,
+            style: 0.0,
+            use_speaker_boost: true
           },
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`ElevenLabs API error: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`API error ${response.status}: ${errorText}`);
       }
 
       const audioBlob = await response.blob();
+      
+      if (audioBlob.size === 0) {
+        throw new Error('Empty audio response');
+      }
+
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       
@@ -98,10 +109,11 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
         URL.revokeObjectURL(audioUrl);
       };
 
+      audio.playbackRate = voiceRate;
       await audio.play();
     } catch (error) {
       setVoiceStatus('error');
-      setVoiceError('Failed to generate speech');
+      setVoiceError(error instanceof Error ? error.message : 'Failed to generate speech');
       setIsPlaying(false);
     }
   }, [words, currentIndex, voiceRate, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID]);
@@ -287,11 +299,23 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     return () => window.removeEventListener('keydown', handleSpaceBar);
   }, [handlePlayPause]);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+    };
+  }, []);
+
   const wordsToDisplay =
     voiceMode === 'visual'
       ? words.slice(currentIndex, currentIndex + wordsPerDisplay).join(' ')
       : voiceStatus === 'speaking'
       ? `Speaking: "${words.slice(currentIndex, currentIndex + 10).join(' ')}..."`
+      : voiceStatus === 'error'
+      ? 'Voice error occurred'
       : 'Ready for voice reading...';
 
   if (loading)
