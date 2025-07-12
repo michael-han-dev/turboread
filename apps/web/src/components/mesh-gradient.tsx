@@ -8,5 +8,5 @@ export function MeshGradientComponent({ speed, ...props }: MeshGradientProps) {
     document.body.classList.add('opacity-100')
   }, [])
 
-  return <MeshGradient {...props} speed={speed ? speed / 10 : 0.25} />
+  return <MeshGradient {...props} speed={speed ? speed / 10 : 1} />
 }

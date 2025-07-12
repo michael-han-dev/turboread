@@ -104,12 +104,12 @@ class PopupController {
       
     } catch (error) {
       console.error('Error sending message to content script:', error);
-      this.showStatus('Failed to activate speed reader', 'error');
+      this.showStatus('Failed to activate turboreader', 'error');
     }
   }
 
   private async activateSpeedReader(): Promise<void> {
-    this.showStatus('Activating speed reader...', 'success');
+    this.showStatus('Activating turboreader...', 'success');
     
     await this.sendMessageToContentScript({
       action: 'activate',

@@ -484,7 +484,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       }}
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold">Speed Reader</h3>
+        <h3 className="text-lg font-bold">TurboReader</h3>
         <div className="flex items-center gap-2">
           <button
             onClick={toggleVoiceMode}

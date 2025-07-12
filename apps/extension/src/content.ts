@@ -64,7 +64,7 @@ class TurboReadSpeedReader {
     return `
       <div class="turboread-hud">
         <div class="turboread-header">
-          <h3 class="turboread-title">Speed Reader</h3>
+          <h3 class="turboread-title">TurboReader</h3>
           <div class="turboread-header-controls">
             <button id="close-btn" class="turboread-close-btn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -829,4 +829,4 @@ function getPageText(): string {
   return cleanedText;
 }
 
-console.log('TurboRead content script loaded - Press Shift+8 to activate speed reader'); 
+console.log('TurboRead content script loaded - Press Shift+8 to activate turboreader'); 
