@@ -78,24 +78,23 @@ class TurboReadSpeedReader {
         
         <div class="turboread-word-display">
           <div class="turboread-word-text">Ready to read...</div>
-          <div class="turboread-word-progress">0 of 0 words</div>
+          <div class="turboread-word-progress">
+            <input id="start-index-input" type="number" min="1" value="1" class="turboread-number-input" />
+            <span> of </span>
+            <span id="total-words">0</span>
+            <span> words</span>
+          </div>
         </div>
         
         <div class="turboread-controls">
-          <div class="turboread-setting-group">
-            <label class="turboread-setting-label">Words Per Minute (A/D)</label>
-            <div class="turboread-slider-container">
-              <input type="range" id="wpm-slider" min="50" max="1000" value="${this.settings.wpm}" class="turboread-slider">
-              <div class="turboread-slider-value">${this.settings.wpm}</div>
-            </div>
+          <div class="turboread-setting-row">
+            <label class="turboread-setting-label" for="wpm-input">Words Per Minute (A/D)</label>
+            <input type="number" id="wpm-input" min="50" max="1000" value="${this.settings.wpm}" class="turboread-number-input" />
           </div>
-          
-          <div class="turboread-setting-group">
-            <label class="turboread-setting-label">Words Per Display (H/K)</label>
-            <div class="turboread-slider-container">
-              <input type="range" id="words-slider" min="1" max="10" value="${this.settings.wordsPerDisplay}" class="turboread-slider">
-              <div class="turboread-slider-value">${this.settings.wordsPerDisplay}</div>
-            </div>
+
+          <div class="turboread-setting-row">
+            <label class="turboread-setting-label" for="words-input">Words Per Display (J/K)</label>
+            <input type="number" id="words-input" min="1" max="10" value="${this.settings.wordsPerDisplay}" class="turboread-number-input" />
           </div>
           
           <div class="turboread-button-container">
@@ -152,9 +151,9 @@ class TurboReadSpeedReader {
           width: 320px !important;
           background: linear-gradient(135deg, rgba(100, 21, 255, 0.85) 0%, rgba(88, 28, 135, 0.85) 100%) !important;
           /* Slate glass background */
-          background: rgba(30, 41, 59, 0.9) !important;
-          backdrop-filter: blur(12px) !important;
-          -webkit-backdrop-filter: blur(12px) !important;
+          background: rgba(30, 41, 59, 0.6) !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
           border: 1px solid rgba(71, 85, 105, 0.3) !important;
           border-radius: 16px !important;
           padding: 20px !important;
@@ -375,6 +374,21 @@ class TurboReadSpeedReader {
           font-weight: 500 !important;
           letter-spacing: 0.025em !important;
         }
+
+        /* rows for settings */
+        .turboread-setting-row {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          gap: 16px !important;
+          margin-bottom: 20px !important;
+        }
+        .turboread-setting-label {
+          font-size: 14px !important;
+          font-weight: 600 !important;
+          color: rgba(255, 255, 255, 0.9) !important;
+          margin: 0 !important;
+        }
         
         .turboread-reading-progress {
           position: fixed !important;
@@ -394,6 +408,26 @@ class TurboReadSpeedReader {
           padding: 1px 2px !important;
           margin: -1px -2px !important;
         }
+
+        .turboread-number-input {
+          width: 50px !important;
+          padding: 3px 4px !important;
+          border-radius: 8px !important;
+          border: 1px solid rgba(71, 85, 105, 0.3) !important;
+          background: rgba(71, 85, 105, 0.5) !important;
+          color: white !important;
+          text-align: center !important;
+          font-weight: 600 !important;
+        }
+        /* remove spin buttons */
+        .turboread-number-input::-webkit-inner-spin-button,
+        .turboread-number-input::-webkit-outer-spin-button {
+          -webkit-appearance: none !important;
+          margin: 0 !important;
+        }
+        .turboread-number-input {
+          -moz-appearance: textfield !important; /* Firefox */
+        }
       `;
       document.head.appendChild(style);
     }
@@ -408,23 +442,40 @@ class TurboReadSpeedReader {
     const resetBtn = this.container.querySelector('#reset-btn') as HTMLButtonElement;
     const closeBtn = this.container.querySelector('#close-btn') as HTMLButtonElement;
 
-    const wpmSlider = this.container.querySelector('#wpm-slider') as HTMLInputElement;
-    const wordsSlider = this.container.querySelector('#words-slider') as HTMLInputElement;
+    const wpmInput = this.container.querySelector('#wpm-input') as HTMLInputElement;
+    const wordsInput = this.container.querySelector('#words-input') as HTMLInputElement;
+
+    const startIndexInput = this.container.querySelector('#start-index-input') as HTMLInputElement;
 
     playBtn?.addEventListener('click', () => this.togglePlayPause());
     resetBtn?.addEventListener('click', () => this.reset());
     closeBtn?.addEventListener('click', () => this.close());
 
-    wpmSlider?.addEventListener('input', (e) => {
-      const value = parseInt((e.target as HTMLInputElement).value);
-      this.settings.wpm = value;
+    const handleWpmChange = (value: number) => {
+      this.settings.wpm = Math.max(50, Math.min(1000, value));
       this.updateSliderValues();
-    });
+      if (this.isPlaying) {
+        this.stopReading();
+        this.startReading();
+      }
+    };
 
-    wordsSlider?.addEventListener('input', (e) => {
-      const value = parseInt((e.target as HTMLInputElement).value);
-      this.settings.wordsPerDisplay = value;
+    const handleWordsChange = (value: number) => {
+      this.settings.wordsPerDisplay = Math.max(1, Math.min(10, value));
       this.updateSliderValues();
+      this.updateUI();
+    };
+
+    wpmInput?.addEventListener('input', (e) => handleWpmChange(parseInt((e.target as HTMLInputElement).value)));
+    wordsInput?.addEventListener('input', (e) => handleWordsChange(parseInt((e.target as HTMLInputElement).value)));
+
+    startIndexInput?.addEventListener('input', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value);
+      if (!isNaN(value)) {
+        this.currentIndex = Math.max(0, Math.min(this.words.length - 1, value - 1));
+        this.updateProgress();
+        this.updateUI();
+      }
     });
 
     document.addEventListener('keydown', this.handleKeyDown.bind(this));
@@ -464,6 +515,63 @@ class TurboReadSpeedReader {
       case 'Escape':
         this.close();
         break;
+      // Move HUD with arrow keys
+      case 'ArrowUp':
+        e.preventDefault();
+        this.position.y = Math.max(0, this.position.y - 25);
+        this.updatePosition();
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        this.position.y = Math.min(window.innerHeight - 400, this.position.y + 25);
+        this.updatePosition();
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        this.position.x = Math.max(0, this.position.x - 25);
+        this.updatePosition();
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        this.position.x = Math.min(window.innerWidth - 320, this.position.x + 25);
+        this.updatePosition();
+        break;
+      // Adjust speed (A/D)
+      case 'a':
+      case 'A':
+        e.preventDefault();
+        this.settings.wpm = Math.max(50, this.settings.wpm - 10);
+        this.updateSliderValues();
+        if (this.isPlaying) {
+          this.stopReading();
+          this.startReading();
+        }
+        break;
+      case 'd':
+      case 'D':
+        e.preventDefault();
+        this.settings.wpm = Math.min(1000, this.settings.wpm + 10);
+        this.updateSliderValues();
+        if (this.isPlaying) {
+          this.stopReading();
+          this.startReading();
+        }
+        break;
+      // Adjust words per display (H/K)
+      case 'j':
+      case 'J':
+        e.preventDefault();
+        this.settings.wordsPerDisplay = Math.max(1, this.settings.wordsPerDisplay - 1);
+        this.updateSliderValues();
+        this.updateUI();
+        break;
+      case 'k':
+      case 'K':
+        e.preventDefault();
+        this.settings.wordsPerDisplay = Math.min(10, this.settings.wordsPerDisplay + 1);
+        this.updateSliderValues();
+        this.updateUI();
+        break;
     }
   }
 
@@ -495,18 +603,19 @@ class TurboReadSpeedReader {
   private updateSliderValues(): void {
     if (!this.container) return;
 
-    const wpmValue = this.container.querySelector('.turboread-slider-container .turboread-slider-value') as HTMLElement;
-    const wordsValue = this.container.querySelectorAll('.turboread-slider-container .turboread-slider-value')[1] as HTMLElement;
+    const wpmInput = this.container.querySelector('#wpm-input') as HTMLInputElement;
+    const wordsInput = this.container.querySelector('#words-input') as HTMLInputElement;
 
-    if (wpmValue) wpmValue.textContent = this.settings.wpm.toString();
-    if (wordsValue) wordsValue.textContent = this.settings.wordsPerDisplay.toString();
+    if (wpmInput) wpmInput.value = this.settings.wpm.toString();
+    if (wordsInput) wordsInput.value = this.settings.wordsPerDisplay.toString();
   }
 
   private updateUI(): void {
     if (!this.container) return;
 
     const wordText = this.container.querySelector('.turboread-word-text') as HTMLElement;
-    const wordProgress = this.container.querySelector('.turboread-word-progress') as HTMLElement;
+    const startIndexInput = this.container.querySelector('#start-index-input') as HTMLInputElement;
+    const totalWordsSpan = this.container.querySelector('#total-words') as HTMLElement;
     const playBtn = this.container.querySelector('#play-btn') as HTMLButtonElement;
 
     if (wordText) {
@@ -518,13 +627,8 @@ class TurboReadSpeedReader {
       }
     }
 
-    if (wordProgress) {
-      if (this.words.length > 0) {
-        wordProgress.textContent = `${Math.min(this.currentIndex + this.settings.wordsPerDisplay, this.words.length)} of ${this.words.length} words`;
-      } else {
-        wordProgress.textContent = '0 of 0 words';
-      }
-    }
+    if (startIndexInput) startIndexInput.value = (this.currentIndex + 1).toString();
+    if (totalWordsSpan) totalWordsSpan.textContent = this.words.length.toString();
 
     if (playBtn) {
       const playIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"></polygon></svg>`;
@@ -680,24 +784,22 @@ class TurboReadSpeedReader {
     if (this.intervalRef) return;
 
     const delay = 60000 / this.settings.wpm;
-    
+
+    // Show the first chunk immediately
+    this.updateProgress();
+    this.updateUI();
+
     this.intervalRef = window.setInterval(() => {
-      const endIndex = this.currentIndex + this.settings.wordsPerDisplay - 1;
-      this.highlightWords(this.currentIndex, endIndex);
-      
       this.currentIndex += this.settings.wordsPerDisplay;
-      
+
       if (this.currentIndex >= this.words.length) {
         this.stopReading();
         return;
       }
-      
+
       this.updateProgress();
       this.updateUI();
     }, delay);
-
-    // Highlight first words immediately
-    this.highlightWords(this.currentIndex, this.currentIndex + this.settings.wordsPerDisplay - 1);
   }
 
   private stopReading(): void {
@@ -706,21 +808,18 @@ class TurboReadSpeedReader {
       this.intervalRef = null;
     }
     this.isPlaying = false;
-    this.clearHighlights();
   }
 
   private reset(): void {
     this.stopReading();
     this.currentIndex = 0;
     this.isPlaying = false;
-    this.clearHighlights();
     this.updateProgress();
     this.updateUI();
   }
 
   private close(): void {
     this.stopReading();
-    this.clearHighlights();
     if (this.container) {
       this.container.remove();
     }
@@ -728,7 +827,7 @@ class TurboReadSpeedReader {
       this.progressBar.remove();
       this.progressBar = null;
     }
-    
+
     document.removeEventListener('keydown', this.handleKeyDown.bind(this));
     speedReader = null;
   }
@@ -736,7 +835,7 @@ class TurboReadSpeedReader {
   public loadText(text: string): void {
     this.words = text.split(/\s+/).filter(word => word.length > 0);
     this.currentIndex = 0;
-    this.mapWordsToDOM(text);
+    this.updateProgress();
     this.updateUI();
   }
 }
