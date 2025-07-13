@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1751503396388,
-      "tag": "0000_cool_prodigy",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1751907804120,
-      "tag": "0001_melted_sugar_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1751926775318,
-      "tag": "0002_harsh_kitty_pryde",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1752012791385,
-      "tag": "0003_wandering_pete_wisdom",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1752085467877,
-      "tag": "0004_unusual_hellion",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1752286254214,
-      "tag": "0005_robust_nico_minoru",
+      "when": 1752442977767,
+      "tag": "0000_lethal_scarlet_spider",
       "breakpoints": true
     }
   ]

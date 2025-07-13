@@ -4,7 +4,8 @@
     "type": "module",
     "scripts": {
         "generate": "drizzle-kit generate",
-        "dev": "bun run index.ts"
+        "push": "drizzle-kit push:pg",
+        "dev": "bun --env-file .env run index.ts"
     },
     "dependencies": {
         "@auth/drizzle-adapter": "^1.10.0",

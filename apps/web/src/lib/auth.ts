@@ -5,7 +5,9 @@ import { drizzle } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 
 //potentially conflicting as this may not be s3.
-const client = postgres(process.env.DATABASE_URL!)
+const client = postgres(process.env.DATABASE_URL!, {
+  ssl: 'require',
+})
 const authDb = drizzle(client)
 
 export const authOptions: NextAuthOptions = {
