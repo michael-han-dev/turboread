@@ -13,6 +13,10 @@
   "peerDependencies": {
     "typescript": "^5"
   },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "format": "prettier --write ."
   },
