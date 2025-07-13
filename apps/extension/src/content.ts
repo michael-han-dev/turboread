@@ -125,6 +125,9 @@ class TurboReadSpeedReader {
   private applyStyles(): void {
     if (!this.container) return;
 
+    const oldStyles = document.getElementById('turboread-styles');
+    if (oldStyles) oldStyles.remove();
+
     if (!document.getElementById('turboread-fonts')) {
       const fontLink = document.createElement('link');
       fontLink.id = 'turboread-fonts';
@@ -148,6 +151,8 @@ class TurboReadSpeedReader {
         .turboread-hud {
           width: 320px !important;
           background: linear-gradient(135deg, rgba(100, 21, 255, 0.85) 0%, rgba(88, 28, 135, 0.85) 100%) !important;
+          /* Slate glass background */
+          background: rgba(30, 41, 59, 0.9) !important;
           backdrop-filter: blur(12px) !important;
           -webkit-backdrop-filter: blur(12px) !important;
           border: 1px solid rgba(71, 85, 105, 0.3) !important;
@@ -169,8 +174,8 @@ class TurboReadSpeedReader {
         .turboread-title {
           margin: 0 !important;
           font-family: 'Instrument Serif', serif !important;
-          font-size: 18px !important;
-          font-weight: 500 !important;
+          font-size: 24px !important;
+          font-weight: 700 !important;
           letter-spacing: -0.5px !important;
           color: white !important;
         }
@@ -216,6 +221,7 @@ class TurboReadSpeedReader {
         .turboread-word-display {
           min-height: 120px !important;
           background: rgba(0, 0, 0, 0.25) !important;
+          background: rgba(51, 65, 85, 0.5) !important;
           border: 1px solid rgba(71, 85, 105, 0.2) !important;
           border-radius: 12px !important;
           padding: 24px !important;

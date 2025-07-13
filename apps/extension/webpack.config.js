@@ -42,7 +42,11 @@ module.exports = {
         },
         {
           from: 'src/content.css',
-          to: 'content.css'
+          to: 'content.css',
+          noErrorOnMissing: true,
+          globOptions: {
+            ignore: ['**/*']
+          }
         },
         {
           from: 'src/icons',
