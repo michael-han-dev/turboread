@@ -12,7 +12,7 @@ export default function Manifesto() {
               href="/"
               className="px-6 py-2 rounded-full text-base font-medium text-slate-12 hover:bg-slate-12/10 transition-colors"
             >
-              Waitlist
+              Home
             </a>
           </li>
           <li>
@@ -21,7 +21,7 @@ export default function Manifesto() {
               aria-current="page"
               className="px-6 py-2 rounded-full text-base font-medium bg-slate-12 text-slate-1 shadow-sm"
             >
-              Manifesto
+              Demo
             </a>
           </li>
         </ul>
@@ -30,7 +30,7 @@ export default function Manifesto() {
       {/* Manifesto content */}
       <div className="max-w-[800px] mx-auto w-full bg-white/10 dark:bg-slate-900/50 dark:bg-slate-900/20 backdrop-blur-md rounded-2xl shadow-lg overflow-hidden">
         <div className="p-12 text-center space-y-6">
-          <h1 className="text-4xl font-medium text-slate-12 font-['var(--font-instrument-serif)']">TurboRead Manifesto</h1>
+          <h1 className="text-4xl font-medium text-slate-12 italic font-serif">TurboRead Demo</h1>
           <p className="text-lg text-slate-10 leading-relaxed">
             TurboRead is on a mission to help everyone read faster, understand deeper, and learn more efficiently.
             We believe technology should augment human cognition—turning dense documents into bite-sized insights and
@@ -41,7 +41,7 @@ export default function Manifesto() {
             knowledge at the speed of thought. Join us on this journey—because the world moves fast, and your reading
             should keep up.
           </p>
-          <p className="text-lg text-slate-11 font-medium">— The TurboRead Team</p>
+          <p className="text-lg text-slate-11 font-medium">— Michael H</p>
         </div>
         <Footer />
       </div>

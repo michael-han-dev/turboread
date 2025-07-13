@@ -23,7 +23,7 @@ export default function Home() {
                 href="/manifesto"
                 className="px-6 py-2 rounded-full text-lg font-medium text-slate-12 hover:bg-slate-12/10 transition-colors"
               >
-                Manifesto
+                Demo
               </a>
             </li>
           </ul>

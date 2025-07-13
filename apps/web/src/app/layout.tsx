@@ -1,4 +1,5 @@
 import type { Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next"
 import { Geist, Instrument_Serif } from "next/font/google";
 import { MeshGradientComponent } from "../components/mesh-gradient";
 import "../styles/globals.css";
@@ -60,6 +61,7 @@ export default function RootLayout({
             height: "100%",
           }}
         />
+        <Analytics />
       </body>
     </html>
   );

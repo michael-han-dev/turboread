@@ -41,6 +41,7 @@
     "@radix-ui/react-tooltip": "1.1.6",
     "@react-email/components": "latest",
     "@vapi-ai/web": "^2.3.8",
+    "@vercel/analytics": "^1.5.0",
     "basehub": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
