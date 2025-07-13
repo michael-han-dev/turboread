@@ -1,8 +1,9 @@
 FROM oven/bun:1.0
 
 WORKDIR /app
+
 COPY packages/api/ ./
 
-RUN ls -R .
+RUN bun install
 
-CMD ["bun", "run", "index.ts"]
+CMD ["bun", "run", "./index.ts"]
