@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import "@radix-ui/colors/slate.css";
-@import "@radix-ui/colors/gray.css";
 
 body {
   font-family: Arial, Helvetica, sans-serif;
