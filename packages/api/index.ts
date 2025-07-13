@@ -279,7 +279,6 @@ const app = new Elysia()
     updatedAt: new Date()
   }).returning();
 
-  // Increment user file count
   await db
     .update(users)
     .set({ fileCount: user.fileCount + 1 })
@@ -347,14 +346,12 @@ const app = new Elysia()
     throw new Error('File not found');
   }
 
-  // Check if we already have parsed 
   const existingParsed = await db
     .select()
     .from(parsedFiles)
     .where(eq(parsedFiles.fileId, file[0].id));
 
   if (existingParsed[0]) {
-    // Return cached parsed content
     return {
       file: file[0],
       parsedText: existingParsed[0].parsedText,
@@ -368,7 +365,6 @@ const app = new Elysia()
     // Download file from S3
     const fileBuffer = await downloadFileFromS3(file[0].key);
     
-    // Parse content based on file type
     const parsedText = await parseFileContent(fileBuffer, file[0].filename);
     const wordCount = countWords(parsedText);
 
@@ -540,7 +536,6 @@ const app = new Elysia()
 
 // Delete a file from S3 and DB
 .delete('/file', async ({ query }) => {
-  // Get file info first to find the user
   const file = await db
     .select()
     .from(files)

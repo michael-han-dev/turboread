@@ -66,6 +66,7 @@ class TurboReadSpeedReader {
         <div class="turboread-header">
           <h3 class="turboread-title">TurboReader</h3>
           <div class="turboread-header-controls">
+            <div class="turboread-badge">Visual</div>
             <button id="close-btn" class="turboread-close-btn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -115,7 +116,7 @@ class TurboReadSpeedReader {
         </div>
         
         <div class="turboread-instructions">
-          Space: play/pause • mouse/arrows: move • ESC: close
+          V: voice mode • Space: play/pause • mouse/arrows: move • ESC: close
         </div>
       </div>
     `;
@@ -146,7 +147,7 @@ class TurboReadSpeedReader {
         
         .turboread-hud {
           width: 320px !important;
-          background: rgba(15, 23, 42, 0.85) !important;
+          background: linear-gradient(135deg, rgba(100, 21, 255, 0.85) 0%, rgba(88, 28, 135, 0.85) 100%) !important;
           backdrop-filter: blur(12px) !important;
           -webkit-backdrop-filter: blur(12px) !important;
           border: 1px solid rgba(71, 85, 105, 0.3) !important;
@@ -179,6 +180,19 @@ class TurboReadSpeedReader {
           gap: 8px !important;
         }
         
+        .turboread-badge {
+          background-color: rgba(31, 41, 55, 0.8);
+          color: white;
+          padding: 6px 10px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          border: 1px solid rgba(71, 85, 105, 0.6);
+        }
+
         .turboread-close-btn {
           background: rgba(239, 68, 68, 0.15) !important;
           border: 1px solid rgba(239, 68, 68, 0.3) !important;
@@ -231,6 +245,10 @@ class TurboReadSpeedReader {
           font-size: 14px !important;
           color: rgba(255, 255, 255, 0.7) !important;
           font-weight: 500 !important;
+          background: rgba(31, 41, 55, 0.8) !important;
+          padding: 6px 20px !important;
+          border-radius: 8px !important;
+          margin-top: 8px !important;
         }
         
         .turboread-controls {
@@ -270,7 +288,7 @@ class TurboReadSpeedReader {
           appearance: none !important;
           width: 18px !important;
           height: 18px !important;
-          background: rgb(34, 197, 94) !important;
+          background: rgb(147, 197, 253) !important; /* sky-300 */
           border-radius: 50% !important;
           cursor: pointer !important;
           border: 2px solid white !important;
@@ -279,7 +297,7 @@ class TurboReadSpeedReader {
         }
         
         .turboread-slider::-webkit-slider-thumb:hover {
-          background: rgb(22, 163, 74) !important;
+          background: rgb(96, 165, 250) !important; /* sky-400 */
           transform: scale(1.1) !important;
         }
         

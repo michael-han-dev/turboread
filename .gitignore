@@ -53,5 +53,4 @@ keys/
 
 # Build artifacts
 **/.next
-**/dist
 .cursor
