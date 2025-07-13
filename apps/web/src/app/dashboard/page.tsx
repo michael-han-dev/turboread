@@ -7,6 +7,9 @@ import { FileText } from "lucide-react"
 import { AuthNav } from "../../components/auth-nav"
 import { Footer } from "../../components/footer"
 
+// Base URL for API – allows production override via env var
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
 const FILE_LIMIT = 2;
 const MAX_FILE_SIZE = 20 * 1024 * 1024; 
 
@@ -48,7 +51,7 @@ export default function Dashboard() {
     if (!session?.user?.id) return
     
     try {
-      const response = await fetch(`http://localhost:3001/user/${session.user.id}/file-stats`)
+      const response = await fetch(`${API_BASE}/user/${session.user.id}/file-stats`)
       if (!response.ok) throw new Error('Failed to fetch file stats')
       const stats = await response.json()
       setFileStats(stats)
@@ -61,7 +64,7 @@ export default function Dashboard() {
     if (!session?.user?.id) return
     
     try {
-      const response = await fetch(`http://localhost:3001/files/${session.user.id}`)
+      const response = await fetch(`${API_BASE}/files/${session.user.id}`)
       if (!response.ok) throw new Error('Failed to fetch files')
       const data = await response.json()
       setFiles(data.files)
@@ -102,7 +105,7 @@ export default function Dashboard() {
     try {
       // Get presigned URL
       const urlResponse = await fetch(
-        `http://localhost:3001/upload/url?filename=${encodeURIComponent(file.name)}&type=${encodeURIComponent(file.type)}&size=${file.size}&userId=${session.user.id}`
+        `${API_BASE}/upload/url?filename=${encodeURIComponent(file.name)}&type=${encodeURIComponent(file.type)}&size=${file.size}&userId=${session.user.id}`
       )
       
       if (!urlResponse.ok) {
@@ -124,7 +127,7 @@ export default function Dashboard() {
       if (!uploadResponse.ok) throw new Error('Failed to upload file')
 
       // Save to database - use the key returned from backend
-      const dbResponse = await fetch('http://localhost:3001/upload', {
+      const dbResponse = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,7 +161,7 @@ export default function Dashboard() {
 
   const handleFileDelete = async (fileKey: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/file?key=${encodeURIComponent(fileKey)}`, {
+      const response = await fetch(`${API_BASE}/file?key=${encodeURIComponent(fileKey)}`, {
         method: 'DELETE',
       })
 
