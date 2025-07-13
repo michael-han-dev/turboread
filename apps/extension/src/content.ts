@@ -728,7 +728,7 @@ class TurboReadSpeedReader {
           }
           
           const tagName = parent.tagName.toLowerCase();
-          if (['script', 'style', 'nav', 'header', 'footer'].includes(tagName)) {
+          if (['script', 'style', 'nav', 'header', 'footer', 'time', 'figure'].includes(tagName)) {
             return NodeFilter.FILTER_REJECT;
           }
           
@@ -769,9 +769,7 @@ class TurboReadSpeedReader {
 
   private highlightWords(startIndex: number, endIndex: number): void {
     this.clearHighlights();
-    // rebuild mapping to ensure offsets are valid after DOM mutations
     this.mapWordsToDOM('');
-    
     for (let i = startIndex; i <= Math.min(endIndex, this.wordPositions.length - 1); i++) {
       const wordPos = this.wordPositions[i];
       if (wordPos) {
@@ -786,36 +784,16 @@ class TurboReadSpeedReader {
   }
 
   private highlightSingleWord(wordPos: WordPosition): void {
-    // guard invalid offsets
-    if (wordPos.startOffset >= wordPos.textNode.length || wordPos.endOffset > wordPos.textNode.length) {
-      return;
-    }
     const range = document.createRange();
-    range.setStart(wordPos.textNode, wordPos.startOffset);
-    range.setEnd(wordPos.textNode, wordPos.endOffset);
-    
     try {
+      range.setStart(wordPos.textNode, wordPos.startOffset);
+      range.setEnd(wordPos.textNode, Math.min(wordPos.endOffset, wordPos.textNode.length));
       const span = document.createElement('span');
       span.className = 'turboread-highlight';
       range.surroundContents(span);
       this.highlightElements.push(span);
-    } catch (error) {
-      // If range can't be surrounded, create a manual highlight
-      const span = document.createElement('span');
-      span.className = 'turboread-highlight';
-      span.textContent = wordPos.word;
-      
-      const beforeText = wordPos.textNode.textContent?.substring(0, wordPos.startOffset) || '';
-      const afterText = wordPos.textNode.textContent?.substring(wordPos.endOffset) || '';
-      
-      const parent = wordPos.textNode.parentNode;
-      if (parent) {
-        if (beforeText) parent.insertBefore(document.createTextNode(beforeText), wordPos.textNode);
-        parent.insertBefore(span, wordPos.textNode);
-        if (afterText) parent.insertBefore(document.createTextNode(afterText), wordPos.textNode);
-        parent.removeChild(wordPos.textNode);
-        this.highlightElements.push(span);
-      }
+    } catch (_) {
+      // ignore invalid range; no DOM changes
     }
   }
 
@@ -909,9 +887,9 @@ class TurboReadSpeedReader {
     speedReader = null;
   }
 
-  public loadText(text: string): void {
-    this.mapWordsToDOM(text);
-    this.words = text.split(/\s+/).filter(word => word.length > 0);
+  public loadText(_text?: string): void {
+    this.mapWordsToDOM('');
+    this.words = this.wordPositions.map(p => p.word);
     this.currentIndex = 0;
     this.updateUI();
   }
@@ -1011,7 +989,8 @@ function getPageText(): string {
     '.advertisement', '.ads', '.social-share',
     '.comments', '.comment-section',
     '#turboread-speed-reader',
-    '[aria-hidden="true"]'
+    '[aria-hidden="true"]',
+    'time', 'figure', '.postMetaInline'
   ];
   
   unwantedSelectors.forEach(selector => {
