@@ -1,10 +1,7 @@
 FROM oven/bun:1.0
 
 WORKDIR /app
-
-COPY . .
-
-WORKDIR /app/packages/api
+COPY packages/api/ ./
 
 RUN bun install
 
