@@ -445,6 +445,15 @@ class TurboReadSpeedReader {
         .turboread-number-input {
           -moz-appearance: textfield !important; /* Firefox */
         }
+          /* remove spin buttons */
+        .turboread-number-input1::-webkit-inner-spin-button,
+        .turboread-number-input1::-webkit-outer-spin-button {
+          -webkit-appearance: none !important;
+          margin: 0 !important;
+        }
+        .turboread-number-input1 {
+          -moz-appearance: textfield !important; /* Firefox */
+        }
       `;
       document.head.appendChild(style);
     }
@@ -649,39 +658,35 @@ class TurboReadSpeedReader {
     const totalWordsSpan = this.container.querySelector('#total-words') as HTMLElement;
     const playBtn = this.container.querySelector('#play-btn') as HTMLButtonElement;
 
+    let displayWords: string[] = [];
+    let startIndex = this.currentIndex;
+    let endIndex = this.currentIndex + this.settings.wordsPerDisplay;
+
     if (wordText) {
       if (this.words.length === 0) {
         wordText.textContent = 'Ready to read...';
       } else {
-        // Always try to show exactly wordsPerDisplay words
-        let endIndex = this.currentIndex + this.settings.wordsPerDisplay;
-        let startIndex = this.currentIndex;
-        
-        // If we don't have enough words left, move the window back
         if (endIndex > this.words.length && this.words.length >= this.settings.wordsPerDisplay) {
           const offset = endIndex - this.words.length;
           startIndex = Math.max(0, this.currentIndex - offset);
           endIndex = startIndex + this.settings.wordsPerDisplay;
         }
-        
-        const displayWords = this.words.slice(startIndex, endIndex);
+        displayWords = this.words.slice(startIndex, endIndex);
         const displayText = displayWords.join(' ');
         wordText.textContent = displayText || 'Completed!';
 
-        const baseSize = 20; // base font size in px
+        // dynamic font adjust
+        const baseSize = 20;
         const wordCount = displayWords.length;
         const totalLength = displayText.length;
-
         let newSize = baseSize - (wordCount - 1) * 1.5 - Math.max(0, (totalLength - 30) * 0.2);
-        newSize = Math.max(10, newSize); // set lower bound
+        newSize = Math.max(10, newSize);
 
         const wordDisplay = this.container.querySelector('.turboread-word-display') as HTMLElement;
         if (wordDisplay) {
           let fontSize = newSize;
           wordText.style.fontSize = `${fontSize}px`;
-
-          // Shrink font until it fits vertically inside the container
-          const maxHeight = wordDisplay.clientHeight - 20; // leave some padding
+          const maxHeight = wordDisplay.clientHeight - 20;
           while (wordText.scrollHeight > maxHeight && fontSize > 10) {
             fontSize -= 1;
             wordText.style.fontSize = `${fontSize}px`;
@@ -690,13 +695,17 @@ class TurboReadSpeedReader {
       }
     }
 
+    // highlight words on page
+    if (this.wordPositions.length > 0) {
+      this.highlightWords(startIndex, endIndex - 1);
+    }
+
     if (startIndexInput) startIndexInput.value = (this.currentIndex + 1).toString();
     if (totalWordsSpan) totalWordsSpan.textContent = this.words.length.toString();
 
     if (playBtn) {
       const playIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"></polygon></svg>`;
       const pauseIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
-      
       playBtn.innerHTML = this.isPlaying ? `${pauseIcon} Pause` : `${playIcon} Play`;
     }
 
@@ -760,6 +769,8 @@ class TurboReadSpeedReader {
 
   private highlightWords(startIndex: number, endIndex: number): void {
     this.clearHighlights();
+    // rebuild mapping to ensure offsets are valid after DOM mutations
+    this.mapWordsToDOM('');
     
     for (let i = startIndex; i <= Math.min(endIndex, this.wordPositions.length - 1); i++) {
       const wordPos = this.wordPositions[i];
@@ -775,6 +786,10 @@ class TurboReadSpeedReader {
   }
 
   private highlightSingleWord(wordPos: WordPosition): void {
+    // guard invalid offsets
+    if (wordPos.startOffset >= wordPos.textNode.length || wordPos.endOffset > wordPos.textNode.length) {
+      return;
+    }
     const range = document.createRange();
     range.setStart(wordPos.textNode, wordPos.startOffset);
     range.setEnd(wordPos.textNode, wordPos.endOffset);
@@ -875,11 +890,13 @@ class TurboReadSpeedReader {
     this.stopReading();
     this.currentIndex = 0;
     this.isPlaying = false;
+    this.clearHighlights();
     this.updateUI();
   }
 
   private close(): void {
     this.stopReading();
+    this.clearHighlights();
     if (this.container) {
       this.container.remove();
     }
@@ -893,6 +910,7 @@ class TurboReadSpeedReader {
   }
 
   public loadText(text: string): void {
+    this.mapWordsToDOM(text);
     this.words = text.split(/\s+/).filter(word => word.length > 0);
     this.currentIndex = 0;
     this.updateUI();
