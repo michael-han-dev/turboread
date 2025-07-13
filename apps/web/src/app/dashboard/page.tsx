@@ -7,7 +7,6 @@ import { FileText } from "lucide-react"
 import { AuthNav } from "../../components/auth-nav"
 import { Footer } from "../../components/footer"
 
-// Base URL for API – allows production override via env var
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 const FILE_LIMIT = 2;
