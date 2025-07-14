@@ -40,6 +40,7 @@ export default function FilePage() {
   const [showHUD, setShowHUD] = useState(false);
 
   const fileId = params.id as string;
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
   const getFileType = (filename: string) => {
     const extension = filename.split('.').pop()?.toLowerCase();
@@ -54,7 +55,7 @@ export default function FilePage() {
 
     const fetchFile = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/file/${fileId}`);
+        const response = await fetch(`${API_BASE}/file/${fileId}`);
         if (!response.ok) throw new Error('File not found');
         const data = await response.json();
         setFileData(data);
@@ -62,7 +63,7 @@ export default function FilePage() {
         // For txt files, also fetch parsed content for display
         const fileType = getFileType(data.file.filename);
         if (fileType === 'txt') {
-          const parsedResponse = await fetch(`http://localhost:3001/file/${fileId}/parsed`);
+          const parsedResponse = await fetch(`${API_BASE}/file/${fileId}/parsed`);
           if (parsedResponse.ok) {
             const parsedData: ParsedFileResponse = await parsedResponse.json();
             setParsedContent(parsedData.parsedText);
