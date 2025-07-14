@@ -185,8 +185,8 @@ const generateAudioChunk = async (text: string, voiceId: string): Promise<Buffer
 
 const app = new Elysia()
 .use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
+  origin: true,
+  credentials: false
 }))
 .get('/', () => {
   return { message: 'Server is running!' };
