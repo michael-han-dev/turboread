@@ -44,9 +44,10 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
   const chunkWordCountRef = useRef<number>(200);
 
   const ELEVENLABS_VOICE_ID = 'fATgBRI8wg5KkDFg8vBd';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
   const generateAudioChunk = useCallback(async (chunkIndex: number, startWordIndex: number): Promise<string> => {
-    const response = await fetch(`http://localhost:3001/file/${fileId}/audio/generate`, {
+    const response = await fetch(`${API_BASE}/file/${fileId}/audio/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -64,8 +65,8 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       throw new Error(`Failed to generate audio chunk: ${response.status} ${errorText}`);
     }
 
-    return `http://localhost:3001/file/${fileId}/audio/${chunkIndex}`;
-  }, [fileId, ELEVENLABS_VOICE_ID]);
+    return `${API_BASE}/file/${fileId}/audio/${chunkIndex}`;
+  }, [fileId, ELEVENLABS_VOICE_ID, API_BASE]);
 
   const loadAudioChunk = useCallback(async (chunkIndex: number, startWordIndex: number): Promise<HTMLAudioElement> => {
     const audioUrl = await generateAudioChunk(chunkIndex, startWordIndex);
@@ -303,7 +304,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
     const fetchParsedText = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`http://localhost:3001/file/${fileId}/parsed`);
+        const res = await fetch(`${API_BASE}/file/${fileId}/parsed`);
         if (!res.ok) throw new Error('fetch failed');
         const data: ParsedFileResponse = await res.json();
         const wordArray = data.parsedText.split(/\s+/).filter(Boolean);
@@ -319,7 +320,7 @@ export default function SpeedReaderHUD({ fileId, onClose }: SpeedReaderHUDProps)
       }
     };
     fetchParsedText();
-  }, [fileId, preloadInitialChunks]);
+  }, [fileId, preloadInitialChunks, API_BASE]);
 
   // handles visual mode word advancement based on wpm
   useEffect(() => {

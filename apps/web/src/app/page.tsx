@@ -38,7 +38,14 @@ export default function Home() {
               TurboRead
             </h1>
             <p className="text-2xl text-slate-10 tracking-tight text-pretty max-w-[600px]">
-              Speed-read your documents or anything on the web with highlighting and voice assistance (coming soon!).
+              Speed-read your{" "}
+              <a
+                href="/dashboard"
+                className="underline underline-offset-2 text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                documents
+              </a>{" "}
+              or anything on the web with highlighting and voice assistance.
             </p>
           </div>
           <div className="px-1 py-4 mb-4 items-center flex flex-col w-full max-w-[500px]">
