@@ -45,7 +45,7 @@ const configureCORS = async () => {
         {
           AllowedHeaders: ['*'],
           AllowedMethods: ['GET', 'PUT', 'POST', 'DELETE'],
-          AllowedOrigins: ['http://localhost:3000'],
+          AllowedOrigins: ['*'],
           ExposeHeaders: ['ETag'],
           MaxAgeSeconds: 3600
         }
@@ -243,7 +243,7 @@ const app = new Elysia()
     Key: key,
     ContentType: query.type,
   });
-  const url = await getSignedUrl(s3, command, { expiresIn: 60 });
+  const url = await getSignedUrl(s3, command, { expiresIn: 200 });
   return { url, key };
 }, {
   query: t.Object({
